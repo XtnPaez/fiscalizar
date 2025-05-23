@@ -11,3 +11,4 @@ Es un desarrollo que nos permite gestionar el padrón de graduados con todos sus
 - Vamos a contratar donweb como hosting para el nuevo desarrollo
 - Vamos a alojar la base y nos vamos a conectar remotos
 - Ya conectamos Visual con el repo
+- Subimos el primer commit (dio un error, a ver?)
