@@ -74,18 +74,12 @@ Un DNI aparece aquí si está en `padron_cd`, en `padron_cp`, o en ambos. Si alg
 | Campo | Tipo | Descripción |
 |---|---|---|
 | `id` | BIGINT UNSIGNED | Clave primaria interna. |
-| `orden` | INT | Número de orden en el padrón oficial. |
+| `dni` | INT UNSIGNED | DNI. Clave de cruce con `personas` y resto de tablas. |
 | `apellido` | VARCHAR(120) | Apellido tal como figura en el padrón oficial. |
 | `nombre` | VARCHAR(120) | Nombre tal como figura en el padrón oficial. |
-| `sigla` | VARCHAR(12) | Sigla de la carrera. |
-| `dni` | INT | DNI. Clave de cruce con `personas` y resto de tablas. |
-| `id_carrera` | INT | Referencia a `carreras`. |
-| `id_partido` | INT | Referencia a `partidos`. |
-| `id_trabajo` | INT | Referencia a `trabajos`. |
-| `sedelaboral` | VARCHAR(120) | Texto libre. Dato del padrón oficial. |
-| `comuna_municipio` | VARCHAR(120) | Texto libre. Dato del padrón oficial. |
+| `sigla` | VARCHAR(12) | Sigla de la carrera tal como figura en el padrón oficial. |
 
-**Nota:** los campos `sedelaboral` y `comuna_municipio` se mantienen como texto libre para respetar el formato del padrón oficial. Los datos normalizados de sede y municipio viven en sus propias tablas y se joinean por DNI en las vistas.
+**Nota:** el padrón oficial de CD publicado por la facultad contiene únicamente estos cinco campos. Todo dato adicional (referentes, partido, trabajo, sede laboral, municipio, participación electoral) se joinea por DNI desde sus respectivas tablas en las vistas.
 
 ---
 
@@ -95,17 +89,11 @@ Un DNI aparece aquí si está en `padron_cd`, en `padron_cp`, o en ambos. Si alg
 | Campo | Tipo | Descripción |
 |---|---|---|
 | `id` | BIGINT UNSIGNED | Clave primaria interna. |
-| `dni` | INT | DNI. Clave de cruce con `personas` y resto de tablas. |
-| `nombre` | VARCHAR(120) | Nombre tal como figura en el padrón oficial. |
+| `dni` | INT UNSIGNED | DNI. Clave de cruce con `personas` y resto de tablas. |
 | `apellido` | VARCHAR(120) | Apellido tal como figura en el padrón oficial. |
-| `carrera` | VARCHAR(6) | Sigla de la carrera. |
-| `orden` | INT | Número de orden en el padrón oficial. |
-| `id_carrera` | INT | Referencia a `carreras`. |
-| `id_partido` | INT | Referencia a `partidos`. |
-| `id_trabajo` | INT | Referencia a `trabajos`. |
-| `sedelaboral` | VARCHAR(120) | Texto libre. Dato del padrón oficial. |
-| `comuna_municipio` | VARCHAR(120) | Texto libre. Dato del padrón oficial. |
-| `auxiliar` | TINYINT(1) | 1 si es docente auxiliar, 0 si es graduado. |
+| `nombre` | VARCHAR(120) | Nombre tal como figura en el padrón oficial. |
+
+**Nota:** el padrón oficial de CP publicado por la facultad contiene únicamente estos cuatro campos. Todo dato adicional se joinea por DNI desde sus respectivas tablas en las vistas. El campo `auxiliar` (docente auxiliar) se agrega durante el tuneo previo a la carga, ya que es información que el sistema necesita y que no publica la facultad.
 
 ---
 
