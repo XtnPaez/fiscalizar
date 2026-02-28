@@ -45,60 +45,81 @@ Módulo electoral completo: registro de elecciones, mesas, fiscales y votos en t
 
 ## Principios de diseño
 
-**La lógica vive en la base de datos, no en el PHP.**
-El PHP consulta y presenta. Cualquier cambio en qué datos mostrar, qué listados cruzar o qué campos incluir se resuelve en la base de datos. El código no se toca.
-
 **DNI como clave única de cruce.**
-Toda relación entre tablas usa el DNI como nexo. Es el identificador que permite cruzar padrones, listados externos, historial electoral y cualquier fuente de datos futura.
+Toda relación entre tablas usa el DNI como nexo. Es el identificador que permite cruzar padrones, tablas de referentes, historial electoral y cualquier fuente de datos nueva.
+
+**Los padrones se mantienen puros.**
+`padron_cd` y `padron_cp` se cargan tal como los entrega la facultad, con todos sus campos originales. No se modifican ni normalizan. Son la fuente de verdad oficial.
+
+**`personas` es el núcleo de consolidación.**
+Contiene un registro único por DNI (sin duplicados entre padrones) con apellido y nombre. Es el punto de joineo de todas las tablas por DNI.
 
 **El padrón es acumulativo.**
-Nunca se da de baja a un graduado. El padrón crece elección a elección sumando nuevos habilitados. Hoy supera los 20.000 registros entre ambos padrones.
+Nunca se da de baja a un graduado. Los padrones crecen elección a elección sumando nuevos habilitados. Hoy el padrón CD supera los 20.000 registros.
 
-**Los listados externos se incorporan sin tocar el código.**
-Fuentes de datos adicionales (sedes laborales, municipios, sindicatos, colegios profesionales, etc.) se suben a la base tuneados por el administrador con DNI obligatorio. Una tabla de metadatos (`catalogo`) define qué campos mostrar de cada fuente. El PHP presenta lo que el catálogo le indica.
+**La lógica vive en las vistas, no en el PHP.**
+El PHP hace SELECT contra vistas predefinidas. Cualquier cambio en qué datos cruzar o mostrar se resuelve modificando una vista. El código no se toca.
 
 **Todo exportable a Excel.**
-Cualquier listado visible por pantalla puede descargarse. Las vistas de consulta se diseñan planas y aptas para exportación directa.
+Las vistas se diseñan planas y limpias para que cualquier listado visible por pantalla pueda descargarse directamente sin transformaciones.
+
+**Todas las tablas se administran igual.**
+No hay distinción entre tablas "internas" y "externas". Todas las tablas llegan de alguna fuente, son tuneadas por el administrador y subidas a la base. El sistema las consume a todas de la misma manera, joineando por DNI.
 
 ---
 
 ## Estructura de la base de datos
 
-La base de datos se organiza en cinco capas:
+### Núcleo
+- **`personas`** — DNI, apellido, nombre. Un registro por DNI, sin duplicados. Nunca se elimina un registro.
 
-**Personas:** tabla maestra acumulativa de individuos. Un registro por graduado, DNI como clave única.
+### Padrones
+- **`padron_cd`** — Padrón oficial de Consejo Directivo, tal como lo entrega la facultad.
+- **`padron_cp`** — Padrón oficial de Ciencia Política, tal como lo entrega la facultad.
 
-**Padrones:** `padron_cd` y `padron_cp` son independientes. Contienen los DNIs habilitados para cada proceso electoral. No son subconjuntos uno del otro.
+Los padrones no son subconjuntos uno del otro. Un DNI puede aparecer en uno, en el otro, o en ambos.
 
-**Catálogos:** referentes, espacios políticos, carreras y lugares de trabajo como entidades normalizadas.
+### Catálogos
+- **`referentes`** — Lista de referentes políticos con apellido y nombre separados.
+- **`partidos`** — Espacios políticos.
+- **`trabajos`** — Lugares de trabajo. Incluye categorías como DOCENTE, NO DOCENTE, ADMINISTRATIVO.
+- **`carreras`** — Las 5 carreras de la facultad.
 
-**Listados externos:** fuentes de datos adicionales cruzadas por DNI. Se suben completos (no solo los que matchean hoy) porque el padrón crece y un registro que hoy no matchea puede matchear en el futuro.
+### Relaciones
+- **`referentes_graduado`** — Vincula cada DNI con hasta 3 referentes (límite firme e histórico).
+- **`elecciones`** — Catálogo de procesos electorales pasados y futuros.
+- **`participacion_electoral`** — Historial de participación: qué DNI votó en qué elección.
 
-**Participación electoral:** historial de votos por DNI y elección. Reemplaza las columnas `voto17`, `voto19`, `voto21` embebidas en el padrón actual.
+### Tablas adicionales
+Cualquier tabla nueva (sede laboral, municipio, sindicato, etc.) se agrega con DNI como campo obligatorio de cruce. Se incorpora a las vistas cuando corresponde.
+
+### Vistas principales
+- **`vista_padron_cd`** — Perfil completo de cada habilitado para CD, con todos los datos joineados por DNI.
+- **`vista_padron_cp`** — Ídem para CP.
 
 ---
 
-## Tabla `catalogo`
+## Sistema de login
 
-Define qué campos mostrar en el perfil de un graduado y en los listados. Cada fila especifica: tabla de origen, nombre del campo, orden de presentación, y si aplica al padrón CD, al padrón CP, o a ambos (flags booleanos `cd` y `cp`).
+**Consulta Padrón** tendrá su propio sistema de login con niveles de acceso diferenciados. Cada nivel determina qué campos y qué operaciones puede ver cada usuario. Se diseña en la etapa de desarrollo de Consulta Padrón.
 
-Agregar un nuevo campo o fuente de datos es una operación sobre esta tabla. El PHP no se modifica.
+**Fiscalización** tendrá un sistema de login separado e independiente, diseñado en esa etapa.
 
 ---
 
-## Incorporación de listados externos
+## Incorporación de tablas nuevas
 
-Para incorporar un nuevo listado externo (por ejemplo, afiliados a un sindicato):
+Cuando se incorpora una nueva fuente de datos (por ejemplo, afiliados a un sindicato):
 
-1. El administrador prepara el archivo con los campos requeridos.
-2. Lo sube a la base de datos como tabla nueva.
-3. Registra en `catalogo` los campos que deben mostrarse.
+1. El administrador obtiene el listado, lo analiza y lo tunea.
+2. Lo sube a la base como tabla nueva.
+3. Agrega los campos relevantes a las vistas correspondientes.
 
-**Campos obligatorios en todo listado externo:**
-- `dni` — clave de cruce con la tabla de personas.
-- `nombre` y `apellido` — para verificación manual cuando el DNI no matchea.
+**Campos obligatorios en toda tabla nueva:**
+- `dni` — clave de cruce con `personas`.
+- `apellido` y `nombre` — para verificación manual cuando el DNI no matchea.
 
-El listado se sube completo, no filtrado. Los registros que no matchean hoy pueden matchear en elecciones futuras.
+La tabla se sube completa, no filtrada. Los registros que hoy no matchean con ningún padrón pueden matchear en el futuro cuando ese DNI sea incorporado.
 
 ---
 
@@ -109,7 +130,7 @@ El listado se sube completo, no filtrado. Los registros que no matchean hoy pued
 ├── README.md                   # Este archivo
 ├── docs/                       # Documentación del proyecto
 │   ├── analisis_bbdd.md        # Análisis de la base de datos actual
-│   └── propuesta_bbdd.md       # Propuesta de nueva base de datos (Paso 2)
+│   └── propuesta_bbdd.md       # Propuesta de nueva base de datos
 ├── sql/                        # Scripts SQL
 │   ├── estructura/             # DDL: creación de tablas y vistas
 │   └── migracion/              # Scripts de migración desde la base anterior
@@ -125,7 +146,7 @@ El listado se sube completo, no filtrado. Los registros que no matchean hoy pued
 | Etapa | Estado |
 |---|---|
 | Análisis de base de datos actual | ✅ Completo |
-| Propuesta de nueva base de datos | 🔄 En curso |
+| Propuesta de nueva base de datos | ✅ Completo |
 | Consulta Padrón — desarrollo | ⏳ Pendiente |
 | Fiscalización — desarrollo | ⏳ Pendiente |
 
@@ -134,4 +155,4 @@ El listado se sube completo, no filtrado. Los registros que no matchean hoy pued
 ## Documentación relacionada
 
 - [`docs/analisis_bbdd.md`](docs/analisis_bbdd.md) — Relevamiento y diagnóstico de la base actual, problemas identificados y decisiones de diseño acordadas.
-- [`docs/propuesta_bbdd.md`](docs/propuesta_bbdd.md) — Propuesta de nueva base de datos con DDL comentado.
+- [`docs/propuesta_bbdd.md`](docs/propuesta_bbdd.md) — Propuesta de nueva base de datos con descripción de tablas, relaciones y vistas.

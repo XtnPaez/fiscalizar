@@ -30,6 +30,7 @@ Lista de referentes políticos (~279 registros). Campos: id, nombre (`des`), y d
 
 Problemas:
 - Nombre de columna `des` no descriptivo.
+- Apellido y nombre del referente en un solo campo, sin separación.
 - Flags implementados como `varchar(6)` con valores SI/NO en lugar de booleanos.
 - Registros con ambos flags en NO funcionan como baja lógica, pero no hay un campo `activo` explícito.
 - Engine MyISAM: sin soporte de claves foráneas ni transacciones.
@@ -38,7 +39,7 @@ Problemas:
 Espacios políticos (~53 registros). Misma estructura y mismos problemas que `responsable`. Engine MyISAM.
 
 ### `trabajo`
-Lugares de trabajo (~90 registros). Misma estructura que las anteriores. Incluye entradas como `AUTORIDADES`, `DOCENTES`, `NO DOCENTES` y `SIN DATO` que son categorías administrativas, no empleadores reales. La tabla mezcla dos conceptos distintos. Engine MyISAM.
+Lugares de trabajo (~90 registros). Misma estructura que las anteriores. Incluye entradas como `DOCENTES`, `NO DOCENTES` y `SIN DATO` que son categorías de clasificación con valor para el sistema, no solo empleadores reales. Engine MyISAM.
 
 ---
 
@@ -55,13 +56,15 @@ Los padrones no son subconjuntos uno del otro. Una persona puede estar en uno, e
 
 El padrón es acumulativo: nunca se da de baja a un graduado, solo se suman nuevos habilitados con cada elección. Hoy el padrón de CD supera los 20.000 registros, de los cuales aproximadamente 6.000 votan en cada elección.
 
+Ambos padrones se obtienen de la facultad, se tunean y se suben a la base. Se mantienen puros, con todos sus campos originales, tal como los entrega la fuente oficial.
+
 ### `padroncd24`
 Padrón de graduados habilitados para votar en Consejo Directivo, elección 2024. Campos: id interno, número de orden, apellido, nombre, sigla de carrera, DNI, id_carrera, tres campos de referente (`id_responsable1`, `id_responsable2`, `id_responsable3`), partido político, voto histórico 2021 (`voto21`), lugar de trabajo, sede laboral (texto libre) y comuna/municipio (texto libre). Engine MyISAM, charset latin1.
 
 Problemas:
 - Los tres campos de referente son columnas fijas. Cuando una persona no tiene referente, los tres campos se llenan con el id del registro SIN REFERENTE, lo que no distingue "tiene un referente" de "tiene tres entradas vacías".
-- El historial de votos está embebido como columna en el padrón (`voto21`). Agregar una elección nueva significa agregar una columna nueva a la tabla, lo que hace el esquema dependiente del calendario electoral.
-- `sedelaboral` y `comuna_municipio` son texto libre sin normalizar. En el nuevo diseño estos datos provienen de listados externos cruzados por DNI.
+- El historial de votos está embebido como columna en el padrón (`voto21`). Agregar una elección nueva significa agregar una columna nueva a la tabla.
+- `sedelaboral` y `comuna_municipio` son texto libre sin normalizar. En el nuevo diseño estos datos provienen de tablas dedicadas cruzadas por DNI.
 - El campo `sigla` duplica información ya presente en `carreras`.
 - Engine MyISAM sin integridad referencial. Charset latin1 inconsistente con el resto de la base.
 
@@ -90,27 +93,15 @@ Problemas:
 
 No existe en la base actual ningún mecanismo que defina qué campos mostrar al consultar un graduado. Esa lógica está hardcodeada en el PHP: el código sabe exactamente qué tablas consultar y qué columnas mostrar. Cualquier cambio en los datos a presentar requiere modificar el código.
 
-El nuevo diseño incorpora una tabla de metadatos llamada `catalogo` que invierte esa responsabilidad. El PHP consulta el catálogo para saber qué mostrar, y presenta lo que la base le indique. El catálogo define por cada campo: de qué tabla proviene, cómo se llama la columna, en qué orden mostrarlo, y si aplica al padrón CD, al padrón CP, o a ambos (flags booleanos `cd` y `cp`).
+El nuevo diseño traslada esa responsabilidad a vistas SQL predefinidas. El PHP hace SELECT contra las vistas y presenta lo que encuentra, de forma dinámica. Agregar una tabla nueva o un campo nuevo es una operación sobre la vista. El PHP no se toca.
 
-Agregar un campo nuevo, incorporar un listado externo o modificar lo que se muestra es una operación exclusivamente sobre la base de datos. El PHP no se toca.
-
-Todo listado visible por pantalla debe poder exportarse a Excel. Las vistas de consulta se diseñan planas y limpias para que esa exportación sea directa.
+Todo listado visible por pantalla debe poder exportarse a Excel. Las vistas se diseñan planas y limpias para que esa exportación sea directa.
 
 ---
 
-## 6. Listados externos — situación actual
+## 6. Gestión de tablas — situación actual
 
-No existe soporte para listados externos. La base actual no tiene mecanismo para incorporar fuentes de datos adicionales y cruzarlas con los padrones.
-
-El nuevo diseño incorpora este soporte desde el origen bajo las siguientes reglas:
-
-- Los listados se suben a la base tuneados por el administrador antes de la carga. No se suben crudos.
-- El DNI es el campo obligatorio de cruce. Sin DNI no hay match posible.
-- Los listados se suben completos, no solo los registros que matchean con el padrón vigente. Esto es porque el padrón crece elección a elección y un registro que hoy no matchea puede matchear en el futuro cuando ese graduado sea incorporado.
-- En el catálogo se registran los campos del listado que deben mostrarse.
-- El PHP no distingue entre un campo del padrón y un campo de un listado externo: consulta el catálogo y presenta lo que encuentra.
-
-Ejemplos de listados externos ya identificados: sede laboral, comuna/municipio. Ejemplos de posibles listados futuros: afiliados a un sindicato, miembros de un colegio profesional.
+No hay distinción formal entre tablas administradas por el sistema y tablas incorporadas desde fuentes externas. En el nuevo diseño todas las tablas se tratan igual: el administrador las obtiene, las tunea y las sube. El sistema las consume joineando por DNI. Esta uniformidad simplifica el mantenimiento y elimina la necesidad de categorizar las fuentes.
 
 ---
 
@@ -124,7 +115,7 @@ Ejemplos de listados externos ya identificados: sede laboral, comuna/municipio. 
 
 **Nombres de columnas no descriptivos:** `des` para descripción, `cd` y `cp` para flags. Requieren conocimiento previo del sistema para interpretarse.
 
-**Mezcla de conceptos en `trabajo`:** combina empleadores reales con categorías administrativas como DOCENTES o SIN DATO.
+**Referentes sin separación de apellido y nombre:** el campo `des` en `responsable` contiene apellido y nombre juntos, lo que impide ordenar o filtrar por apellido.
 
 **Historial electoral embebido en el padrón:** los campos `voto17`, `voto19`, `voto21` dentro de la tabla de padrón acoplan el esquema al calendario electoral. En el nuevo diseño el historial de participación es una tabla separada.
 
@@ -136,19 +127,22 @@ Ejemplos de listados externos ya identificados: sede laboral, comuna/municipio. 
 
 Las siguientes decisiones surgen del análisis y quedan registradas aquí como punto de partida para el Paso 2:
 
-1. **DNI como clave única de cruce** en toda la base. Reemplaza cualquier id interno como nexo entre tablas.
-2. **Tabla `personas` acumulativa:** registro maestro de individuos. Nunca se elimina un registro. Los padrones suman graduados nuevos con cada elección.
-3. **`padron_cd` y `padron_cp` como tablas independientes:** cada una contiene los DNIs habilitados para su proceso electoral. No son subconjuntos uno del otro.
-4. **Tabla de participación electoral separada:** registra por DNI, elección y padrón si el graduado votó y en qué fecha. Reemplaza las columnas `voto17`, `voto19`, `voto21` embebidas en el padrón.
-5. **Referentes como tabla de relación:** hasta 3 referentes por persona, almacenados como filas en una tabla separada, no como columnas fijas. Quien no tiene referente no tiene filas en esa tabla.
-6. **Tabla `catalogo`** con flags `cd` y `cp`: define qué campos mostrar para cada padrón. Incluye campos del padrón, de catálogos y de listados externos. El PHP consulta esta tabla para armar la presentación.
-7. **Listados externos con DNI obligatorio:** se suben tuneados y completos. Sus campos a mostrar se registran en `catalogo`.
-8. **Todo InnoDB, todo utf8mb4:** consistencia de engine y charset en toda la base nueva.
-9. **Módulo de fiscalización para etapa futura:** las tablas de mesas, fiscales y registro en tiempo real se diseñarán en la siguiente etapa. No se replican en este diseño.
-10. **Exportación a Excel** contemplada desde el diseño: las vistas de consulta son planas y aptas para exportación directa.
+1. **DNI como clave única de cruce** en toda la base. Es el nexo entre todas las tablas.
+2. **Tabla `personas`:** DNI, apellido y nombre. Un registro por DNI, sin duplicados entre padrones. Nunca se elimina un registro. Es el núcleo del esquema.
+3. **`padron_cd` y `padron_cp` se mantienen puros:** se cargan tal como los entrega la facultad, con todos sus campos originales. No son subconjuntos uno del otro.
+4. **Tabla `referentes_graduado`:** vincula cada DNI con hasta 3 referentes mediante tres columnas fijas (`referente_1`, `referente_2`, `referente_3`). El límite de 3 es firme e histórico.
+5. **Referentes con apellido y nombre separados** en la tabla `referentes`.
+6. **Tabla de participación electoral separada:** registra por DNI y elección si el graduado votó y en qué fecha. Reemplaza las columnas `voto17`, `voto19`, `voto21` embebidas en el padrón.
+7. **Tabla `elecciones`:** catálogo de procesos electorales con identidad propia. Permite registrar elecciones pasadas y futuras.
+8. **Vistas como interfaz para el PHP:** `vista_padron_cd` y `vista_padron_cp` joinean todas las tablas por DNI. El PHP solo hace SELECT contra las vistas. La exportación a Excel se construye dinámicamente desde el resultado de la vista.
+9. **Todas las tablas se administran igual:** no hay distinción entre tablas internas y externas. Toda tabla nueva requiere DNI, apellido y nombre como campos obligatorios.
+10. **Todo InnoDB, todo utf8mb4:** consistencia de engine y charset en toda la base nueva.
+11. **Sistema de login para Consulta Padrón** con niveles de acceso diferenciados. Se diseña en la etapa de desarrollo.
+12. **Sistema de login para Fiscalización** independiente del anterior. Se diseña en esa etapa.
+13. **Módulo de fiscalización para etapa futura:** las tablas de mesas, fiscales y registro en tiempo real se diseñarán en la siguiente etapa sin modificar las tablas existentes.
 
 ---
 
 ## Resumen
 
-La base actual es funcional pero creció sin diseño previo, acumulando deuda técnica en cinco frentes: ausencia de integridad referencial por uso de MyISAM, modelo de referentes con columnas fijas que no distingue ausencia de presencia, historial electoral embebido en el padrón que crece con cada elección, lógica de presentación hardcodeada en el PHP sin posibilidad de adaptarse a nuevas fuentes de datos, y tablas de fiscalización creadas manualmente para cada proceso electoral. El nuevo diseño resuelve estos cinco problemas, mantiene compatibilidad con los datos existentes para que la migración sea posible sin pérdida de información, y establece una arquitectura que puede escalar desde Consulta Padrón hasta Fiscalización sin cambios estructurales.
+La base actual es funcional pero creció sin diseño previo, acumulando deuda técnica en cinco frentes: ausencia de integridad referencial por uso de MyISAM, modelo de referentes con columnas fijas que no distingue ausencia de presencia, historial electoral embebido en el padrón que crece con cada elección, lógica de presentación hardcodeada en el PHP sin posibilidad de adaptarse a nuevas fuentes de datos, y tablas de fiscalización creadas manualmente para cada proceso electoral. El nuevo diseño resuelve estos cinco problemas, mantiene los padrones puros tal como los entrega la facultad, centraliza los individuos en una tabla `personas` joineada por DNI, y establece una arquitectura que puede escalar desde Consulta Padrón hasta Fiscalización sin cambios estructurales.
