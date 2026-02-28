@@ -41,7 +41,6 @@ RELACIONES
 
 TABLAS ADICIONALES (una por fuente, todas con DNI obligatorio)
     sede_laboral
-    comuna_municipio
     (futuras)
 
 VISTAS
@@ -205,8 +204,9 @@ Toda tabla que se incorpore al sistema debe respetar los siguientes campos oblig
 A estos campos se suman los específicos de cada tabla. Los campos que deben mostrarse en las vistas se agregan a las vistas correspondientes cuando se incorpora la tabla.
 
 **Tablas ya identificadas:**
+> **Nota:** `comuna_municipio` no existe como tabla en este esquema. El dato de municipio/comuna proviene de un listado de afiliados a un partido que el administrador tuneará y subirá cuando corresponda. En ese momento se crea la tabla y se extienden las vistas.
+
 - `sede_laboral` — sede laboral normalizada de cada DNI.
-- `comuna_municipio` — municipio o comuna de residencia normalizado.
 
 ---
 
