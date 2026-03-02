@@ -26,7 +26,7 @@ Sistema web de consulta y análisis del padrón de graduados. Permite filtrar po
 Ampliación del modelo de datos y las funcionalidades de consulta y reporte.
 
 **Fiscalización** *(largo plazo)*
-Módulo electoral completo: registro de elecciones, mesas, fiscales y votos en tiempo real. Permite registrar procesos electorales pasados y futuros.
+Módulo electoral completo: registro de elecciones, mesas, fiscales y votos en tiempo real.
 
 ---
 
@@ -35,7 +35,7 @@ Módulo electoral completo: registro de elecciones, mesas, fiscales y votos en t
 | Componente | Tecnología |
 |---|---|
 | Lenguaje backend | PHP sin frameworks |
-| Base de datos | MySQL / MariaDB |
+| Base de datos | MySQL / MariaDB 10.6 |
 | Frontend | HTML + CSS + JavaScript nativo |
 | Servidor | Hosting compartido Wiroos – Plan Personal |
 | Dominio | [fiscalizar.com.ar](http://fiscalizar.com.ar/) |
@@ -43,83 +43,51 @@ Módulo electoral completo: registro de elecciones, mesas, fiscales y votos en t
 
 ---
 
-## Principios de diseño
+## Bases de datos
 
-**DNI como clave única de cruce.**
-Toda relación entre tablas usa el DNI como nexo. Es el identificador que permite cruzar padrones, tablas de referentes, historial electoral y cualquier fuente de datos nueva.
+| Base | Rol |
+|---|---|
+| `fiscaliz_padron` | Base nueva. Esquema rediseñado. Desarrollo activo. |
+| `fiscaliz_fiscalizar` | Base anterior. Solo lectura. Fuente de migración. |
+| `fiscaliz_graduados` | Base de trabajo 2024. Solo lectura. Fuente de migración. |
 
-**Los padrones se mantienen puros.**
-`padron_cd` y `padron_cp` se cargan tal como los entrega la facultad, con todos sus campos originales. No se modifican ni normalizan. Son la fuente de verdad oficial.
-
-**`personas` es el núcleo de consolidación.**
-Contiene un registro único por DNI (sin duplicados entre padrones) con apellido y nombre. Es el punto de joineo de todas las tablas por DNI.
-
-**El padrón es acumulativo.**
-Nunca se da de baja a un graduado. Los padrones crecen elección a elección sumando nuevos habilitados. Hoy el padrón CD supera los 20.000 registros.
-
-**La lógica vive en las vistas, no en el PHP.**
-El PHP hace SELECT contra vistas predefinidas. Cualquier cambio en qué datos cruzar o mostrar se resuelve modificando una vista. El código no se toca.
-
-**Todo exportable a Excel.**
-Las vistas se diseñan planas y limpias para que cualquier listado visible por pantalla pueda descargarse directamente sin transformaciones.
-
-**Todas las tablas se administran igual.**
-No hay distinción entre tablas "internas" y "externas". Todas las tablas llegan de alguna fuente, son tuneadas por el administrador y subidas a la base. El sistema las consume a todas de la misma manera, joineando por DNI.
+Usuario de desarrollo: `fiscaliz_dev` con acceso completo a `fiscaliz_padron`.
 
 ---
 
-## Estructura de la base de datos
+## Principios de diseño
 
-### Núcleo
-- **`personas`** — DNI, apellido, nombre. Un registro por DNI, sin duplicados. Nunca se elimina un registro.
+**DNI como clave única de cruce.**
+Toda relación entre tablas usa el DNI como nexo.
 
-### Padrones
-- **`padron_cd`** — Padrón oficial de Consejo Directivo, tal como lo entrega la facultad.
-- **`padron_cp`** — Padrón oficial de Ciencia Política, tal como lo entrega la facultad.
+**Los padrones se mantienen puros.**
+`padron_cd` y `padron_cp` se cargan tal como los entrega la facultad, con todos sus campos originales.
 
-Los padrones no son subconjuntos uno del otro. Un DNI puede aparecer en uno, en el otro, o en ambos.
+**`personas` es el núcleo de consolidación.**
+Un registro único por DNI. Es el punto de joineo de todas las tablas.
 
-### Catálogos
-- **`referentes`** — Lista de referentes políticos con apellido y nombre separados.
-- **`partidos`** — Espacios políticos.
-- **`trabajos`** — Lugares de trabajo. Incluye categorías como DOCENTE, NO DOCENTE, ADMINISTRATIVO.
-- **`carreras`** — Las 5 carreras de la facultad.
+**El padrón es acumulativo.**
+Nunca se da de baja a un graduado. Los padrones crecen elección a elección.
 
-### Relaciones
-- **`referentes_graduado`** — Vincula cada DNI con hasta 3 referentes (límite firme e histórico).
-- **`elecciones`** — Catálogo de procesos electorales pasados y futuros.
-- **`participacion_electoral`** — Historial de participación: qué DNI votó en qué elección.
+**La lógica vive en las vistas, no en el PHP.**
+El PHP hace SELECT contra `vista_padron_cd` y `vista_padron_cp`. Agregar una tabla nueva o una elección nueva es una operación sobre las vistas. El código no se toca.
 
-### Tablas adicionales
-Cualquier tabla nueva (sede laboral, municipio, sindicato, etc.) se agrega con DNI como campo obligatorio de cruce. Se incorpora a las vistas cuando corresponde.
+**Solo se registran los que votaron.**
+`participacion_electoral` contiene únicamente los DNIs que votaron en cada elección. Quien no figura, no votó.
 
-### Vistas principales
-- **`vista_padron_cd`** — Perfil completo de cada habilitado para CD, con todos los datos joineados por DNI.
-- **`vista_padron_cp`** — Ídem para CP.
+**Todo exportable a Excel.**
+Las vistas se diseñan planas y limpias para exportación directa. El PHP construye el Excel dinámicamente desde las columnas del resultado.
+
+**Todas las tablas se administran igual.**
+No hay distinción entre tablas internas y externas. El administrador las obtiene, las tunea y las sube. El sistema las consume joineando por DNI.
 
 ---
 
 ## Sistema de login
 
-**Consulta Padrón** tendrá su propio sistema de login con niveles de acceso diferenciados. Cada nivel determina qué campos y qué operaciones puede ver cada usuario. Se diseña en la etapa de desarrollo de Consulta Padrón.
+**Consulta Padrón** tendrá su propio sistema de login con niveles de acceso diferenciados. Se diseña en la etapa de desarrollo de Consulta Padrón.
 
 **Fiscalización** tendrá un sistema de login separado e independiente, diseñado en esa etapa.
-
----
-
-## Incorporación de tablas nuevas
-
-Cuando se incorpora una nueva fuente de datos (por ejemplo, afiliados a un sindicato):
-
-1. El administrador obtiene el listado, lo analiza y lo tunea.
-2. Lo sube a la base como tabla nueva.
-3. Agrega los campos relevantes a las vistas correspondientes.
-
-**Campos obligatorios en toda tabla nueva:**
-- `dni` — clave de cruce con `personas`.
-- `apellido` y `nombre` — para verificación manual cuando el DNI no matchea.
-
-La tabla se sube completa, no filtrada. Los registros que hoy no matchean con ningún padrón pueden matchear en el futuro cuando ese DNI sea incorporado.
 
 ---
 
@@ -129,15 +97,13 @@ La tabla se sube completa, no filtrada. Los registros que hoy no matchean con ni
 /
 ├── README.md                   # Este archivo
 ├── docs/                       # Documentación del proyecto
-│   ├── analisis_bbdd.md        # Análisis de la base de datos actual
-│   └── propuesta_bbdd.md       # Propuesta de nueva base de datos
+│   ├── analisis_bbdd.md        # Análisis de la base de datos anterior
+│   └── propuesta_bbdd.md       # Diseño de la nueva base de datos
 ├── sql/                        # Scripts SQL
-│   ├── estructura/             # DDL: creación de tablas y vistas
-│   └── migracion/              # Scripts de migración desde la base anterior
+│   ├── estructura/             # DDL: fiscaliz_padron.sql
+│   └── migracion/              # Scripts de migración desde bases anteriores
 └── consulta_padron/            # Código fuente de la primera etapa
 ```
-
-> El desarrollo activo ocurre en subcarpetas. La raíz del dominio mantiene el sistema anterior hasta que la nueva versión esté lista para reemplazarlo.
 
 ---
 
@@ -145,14 +111,15 @@ La tabla se sube completa, no filtrada. Los registros que hoy no matchean con ni
 
 | Etapa | Estado |
 |---|---|
-| Análisis de base de datos actual | ✅ Completo |
-| Propuesta de nueva base de datos | ✅ Completo |
-| Consulta Padrón — desarrollo | ⏳ Pendiente |
+| Análisis de base de datos anterior | ✅ Completo |
+| Diseño de nueva base de datos | ✅ Completo |
+| Migración de datos | ✅ Completo (pendiente validación profunda antes de producción) |
+| Consulta Padrón — desarrollo | 🔄 En curso |
 | Fiscalización — desarrollo | ⏳ Pendiente |
 
 ---
 
 ## Documentación relacionada
 
-- [`docs/analisis_bbdd.md`](docs/analisis_bbdd.md) — Relevamiento y diagnóstico de la base actual, problemas identificados y decisiones de diseño acordadas.
-- [`docs/propuesta_bbdd.md`](docs/propuesta_bbdd.md) — Propuesta de nueva base de datos con descripción de tablas, relaciones y vistas.
+- [`docs/analisis_bbdd.md`](docs/analisis_bbdd.md) — Relevamiento y diagnóstico de la base anterior, problemas identificados y decisiones de diseño acordadas.
+- [`docs/propuesta_bbdd.md`](docs/propuesta_bbdd.md) — Diseño completo del nuevo esquema con descripción de tablas, relaciones, vistas y estado de carga de datos.

@@ -1,7 +1,7 @@
 # Propuesta de nueva base de datos
 
 **Proyecto:** Fiscalizar  
-**Fecha:** Febrero 2026  
+**Fecha:** Marzo 2026  
 **Etapa:** Paso 2 — Diseño del nuevo esquema  
 
 ---
@@ -35,13 +35,15 @@ CATÁLOGOS
     trabajos
 
 RELACIONES
-    referentes_graduado     (DNI ↔ hasta 3 referentes)
+    referentes_graduado     (DNI ↔ hasta 3 referentes, límite firme e histórico)
+    persona_partido         (DNI ↔ espacio político)
+    persona_trabajo         (DNI ↔ lugar de trabajo)
     elecciones              (catálogo de procesos electorales)
-    participacion_electoral (historial: quién votó en qué elección)
+    participacion_electoral (historial: solo se registran los que votaron)
 
-TABLAS ADICIONALES (una por fuente, todas con DNI obligatorio)
+TABLAS ADICIONALES (una por fuente, DNI obligatorio)
     sede_laboral
-    (futuras)
+    (futuras: sindicato, colegio profesional, afiliación partidaria, etc.)
 
 VISTAS
     vista_padron_cd
@@ -61,224 +63,264 @@ Un DNI aparece aquí si está en `padron_cd`, en `padron_cp`, o en ambos. Si alg
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `dni` | INT UNSIGNED | Clave primaria. Identificador único. |
+| `dni` | INT UNSIGNED | Clave primaria. |
 | `apellido` | VARCHAR(120) | Apellido en mayúsculas. |
-| `nombre` | VARCHAR(120) | Nombre/s en mayúsculas. |
+| `nombre` | VARCHAR(120) | Nombre en mayúsculas. |
 
 ---
 
 ### `padron_cd`
-**Rol:** padrón oficial de Consejo Directivo tal como lo entrega la facultad. Se actualiza con cada elección sumando los nuevos habilitados. Nunca se eliminan registros. No contiene DNIs repetidos dentro de la tabla, pero puede compartir DNIs con `padron_cp`.
+**Rol:** padrón oficial de Consejo Directivo tal como lo publica la facultad. Acumulativo: solo se agregan registros, nunca se eliminan. No contiene DNIs repetidos internamente, pero puede compartir DNIs con `padron_cp`.
 
 | Campo | Tipo | Descripción |
 |---|---|---|
 | `id` | BIGINT UNSIGNED | Clave primaria interna. |
-| `dni` | INT UNSIGNED | DNI. Clave de cruce con `personas` y resto de tablas. |
-| `apellido` | VARCHAR(120) | Apellido tal como figura en el padrón oficial. |
-| `nombre` | VARCHAR(120) | Nombre tal como figura en el padrón oficial. |
-| `sigla` | VARCHAR(12) | Sigla de la carrera tal como figura en el padrón oficial. |
-
-**Nota:** el padrón oficial de CD publicado por la facultad contiene únicamente estos cinco campos. Todo dato adicional (referentes, partido, trabajo, sede laboral, municipio, participación electoral) se joinea por DNI desde sus respectivas tablas en las vistas.
+| `dni` | INT UNSIGNED | Clave foránea a `personas`. |
+| `apellido` | VARCHAR(120) | Tal como figura en el padrón oficial. |
+| `nombre` | VARCHAR(120) | Tal como figura en el padrón oficial. |
+| `sigla` | VARCHAR(12) | Sigla de la carrera según el padrón oficial. |
 
 ---
 
 ### `padron_cp`
-**Rol:** padrón oficial de Ciencia Política tal como lo entrega la facultad. Misma lógica acumulativa que `padron_cd`. Incluye graduados de CP y docentes auxiliares habilitados.
+**Rol:** padrón oficial de Ciencia Política tal como lo publica la facultad. Incluye graduados de CP y docentes auxiliares. El campo `auxiliar` se agrega durante el tuneo previo a la carga. Los auxiliares que no figuren en el padrón oficial se incorporan desde la tabla `auxiliarescp24` en `fiscaliz_graduados`.
 
 | Campo | Tipo | Descripción |
 |---|---|---|
 | `id` | BIGINT UNSIGNED | Clave primaria interna. |
-| `dni` | INT UNSIGNED | DNI. Clave de cruce con `personas` y resto de tablas. |
-| `apellido` | VARCHAR(120) | Apellido tal como figura en el padrón oficial. |
-| `nombre` | VARCHAR(120) | Nombre tal como figura en el padrón oficial. |
-
-**Nota:** el padrón oficial de CP publicado por la facultad contiene únicamente estos cuatro campos. Todo dato adicional se joinea por DNI desde sus respectivas tablas en las vistas. El campo `auxiliar` (docente auxiliar) se agrega durante el tuneo previo a la carga, ya que es información que el sistema necesita y que no publica la facultad.
+| `dni` | INT UNSIGNED | Clave foránea a `personas`. |
+| `apellido` | VARCHAR(120) | Tal como figura en el padrón oficial. |
+| `nombre` | VARCHAR(120) | Tal como figura en el padrón oficial. |
+| `auxiliar` | TINYINT(1) | 1 = docente auxiliar, 0 = graduado. |
 
 ---
 
 ### `carreras`
-**Rol:** catálogo de las 5 carreras de la facultad. Sin cambios respecto al diseño actual, solo se migra al nuevo esquema.
+**Rol:** catálogo de las 5 carreras de la facultad.
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `id` | INT AUTO_INCREMENT | Clave primaria. |
-| `descripcion` | VARCHAR(50) | Nombre completo de la carrera. |
+| `id` | INT | Clave primaria. |
+| `descripcion` | VARCHAR(50) | Nombre completo. |
 | `sigla` | VARCHAR(5) | Sigla. Ej: CP, CS, RT, TS, CC. |
 
 ---
 
 ### `referentes`
-**Rol:** catálogo de referentes políticos. Reemplaza a `responsable` con nombres descriptivos, apellido y nombre separados, y tipos de datos correctos.
+**Rol:** catálogo de referentes políticos. Apellido y nombre en campos separados. Regla de separación: todo lo que está después del último espacio es apellido. El registro SIN REFERENTE se mantiene como valor explícito con id=1.
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `id` | INT AUTO_INCREMENT | Clave primaria. |
+| `id` | INT | Clave primaria. |
 | `apellido` | VARCHAR(80) | Apellido del referente. |
 | `nombre` | VARCHAR(80) | Nombre del referente. |
 | `aplica_cd` | TINYINT(1) | 1 si aplica al padrón CD. |
 | `aplica_cp` | TINYINT(1) | 1 si aplica al padrón CP. |
-| `activo` | TINYINT(1) | 1 activo, 0 dado de baja lógica. |
-
-**Nota:** se mantiene el registro SIN REFERENTE como entrada explícita del catálogo.
+| `activo` | TINYINT(1) | 1 activo, 0 baja lógica. |
 
 ---
 
 ### `partidos`
-**Rol:** catálogo de espacios políticos. Reemplaza a `partido`.
+**Rol:** catálogo de espacios políticos.
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `id` | INT AUTO_INCREMENT | Clave primaria. |
+| `id` | INT | Clave primaria. |
 | `nombre` | VARCHAR(80) | Nombre del espacio político. |
 | `aplica_cd` | TINYINT(1) | 1 si aplica al padrón CD. |
 | `aplica_cp` | TINYINT(1) | 1 si aplica al padrón CP. |
-| `activo` | TINYINT(1) | 1 activo, 0 dado de baja lógica. |
+| `activo` | TINYINT(1) | 1 activo, 0 baja lógica. |
 
 ---
 
 ### `trabajos`
-**Rol:** catálogo de lugares de trabajo. Reemplaza a `trabajo`. Mantiene las categorías DOCENTE, NO DOCENTE y ADMINISTRATIVO como valores válidos con significado para el sistema.
+**Rol:** catálogo de lugares de trabajo. Incluye las categorías DOCENTE, NO DOCENTE y ADMINISTRATIVO como valores válidos con significado para el sistema.
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `id` | INT AUTO_INCREMENT | Clave primaria. |
+| `id` | INT | Clave primaria. |
 | `nombre` | VARCHAR(120) | Nombre del lugar de trabajo o categoría. |
 | `aplica_cd` | TINYINT(1) | 1 si aplica al padrón CD. |
 | `aplica_cp` | TINYINT(1) | 1 si aplica al padrón CP. |
-| `activo` | TINYINT(1) | 1 activo, 0 dado de baja lógica. |
+| `activo` | TINYINT(1) | 1 activo, 0 baja lógica. |
 
 ---
 
 ### `referentes_graduado`
-**Rol:** vincula cada DNI con hasta 3 referentes. El límite de 3 es firme e histórico. Se usan tres columnas fijas en lugar de filas para simplificar las vistas y la presentación. Los campos nulos indican ausencia de referente en esa posición.
+**Rol:** vincula cada DNI con hasta 3 referentes. El límite de 3 es firme e histórico. NULL indica ausencia de referente en esa posición. Quien no tiene ningún referente no tiene fila en esta tabla.
 
 | Campo | Tipo | Descripción |
 |---|---|---|
 | `dni` | INT UNSIGNED | Clave primaria y foránea a `personas`. |
-| `referente_1` | INT | Referencia a `referentes`. Primer referente. NULL si no tiene. |
-| `referente_2` | INT | Referencia a `referentes`. Segundo referente. NULL si no tiene. |
-| `referente_3` | INT | Referencia a `referentes`. Tercer referente. NULL si no tiene. |
+| `referente_1` | INT | Foránea a `referentes`. NULL si no tiene. |
+| `referente_2` | INT | Foránea a `referentes`. NULL si no tiene. |
+| `referente_3` | INT | Foránea a `referentes`. NULL si no tiene. |
 
-**Justificación:** tres columnas fijas permiten que las vistas armen la presentación con un JOIN simple por cada columna, sin lógica adicional. El PHP recibe los tres valores (o NULL) y decide si mostrarlos o mostrar "Sin referente".
+---
+
+### `persona_partido`
+**Rol:** vincula cada DNI con su espacio político. Un partido por persona. Quien no tiene partido no tiene fila en esta tabla. Se llena y actualiza vía ABM del sistema o carga manual.
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `dni` | INT UNSIGNED | Clave primaria y foránea a `personas`. |
+| `id_partido` | INT | Foránea a `partidos`. |
+
+---
+
+### `persona_trabajo`
+**Rol:** vincula cada DNI con su lugar de trabajo. Un trabajo por persona. Quien no tiene trabajo no tiene fila en esta tabla. Se llena y actualiza vía ABM del sistema o carga manual.
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `dni` | INT UNSIGNED | Clave primaria y foránea a `personas`. |
+| `id_trabajo` | INT | Foránea a `trabajos`. |
 
 ---
 
 ### `elecciones`
-**Rol:** catálogo de procesos electorales. Permite registrar elecciones pasadas y futuras como entidades con identidad propia, evitando que el año electoral se deduzca por las fechas de los registros de voto.
+**Rol:** catálogo de procesos electorales pasados y futuros. Solo una elección puede estar activa por tipo en simultáneo.
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `id` | INT AUTO_INCREMENT | Clave primaria. |
-| `nombre` | VARCHAR(80) | Nombre descriptivo. Ej: "Elección CD 2024". |
+| `id` | INT | Clave primaria. |
+| `nombre` | VARCHAR(80) | Ej: Elección CD 2024. |
 | `tipo` | ENUM('cd','cp') | Tipo de proceso electoral. |
-| `fecha` | DATE | Fecha de la elección. |
-| `activa` | TINYINT(1) | 1 si es la elección en curso. Solo una puede estar activa por tipo. |
+| `anio` | YEAR | Año de la elección. |
+| `activa` | TINYINT(1) | 1 = elección en curso. |
+
+**Elecciones cargadas:**
+
+| id | nombre | tipo | anio |
+|---|---|---|---|
+| 1 | Elección CP 2017 | cp | 2017 |
+| 2 | Elección CP 2019 | cp | 2019 |
+| 3 | Elección CD 2021 | cd | 2021 |
+| 4 | Elección CP 2021 | cp | 2021 |
+| 5 | Elección CD 2024 | cd | 2024 |
+| 6 | Elección CP 2024 | cp | 2024 |
 
 ---
 
 ### `participacion_electoral`
-**Rol:** historial de participación de cada graduado en cada elección. Reemplaza los campos `voto17`, `voto19`, `voto21` embebidos en los padrones actuales. Agregar una elección nueva es insertar filas aquí, no agregar columnas al padrón.
+**Rol:** historial de participación. Solo se registran los que votaron. Quien no figura en esta tabla para una elección determinada, no votó. Agregar una elección nueva es insertar filas aquí, no modificar el esquema.
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `id` | INT AUTO_INCREMENT | Clave primaria. |
-| `dni` | INT UNSIGNED | Referencia a `personas`. |
-| `id_eleccion` | INT | Referencia a `elecciones`. |
-| `voto` | TINYINT(1) | 1 si votó, 0 si no votó. |
+| `id` | INT | Clave primaria. |
+| `dni` | INT UNSIGNED | Foránea a `personas`. |
+| `id_eleccion` | INT | Foránea a `elecciones`. |
 | `fecha_registro` | DATE | Fecha en que se registró el voto. |
 
 ---
 
 ### Tablas adicionales
 
-Toda tabla que se incorpore al sistema debe respetar los siguientes campos obligatorios como mínimo:
+Toda tabla que se incorpore al sistema debe respetar los siguientes campos obligatorios:
 
 | Campo | Tipo | Descripción |
 |---|---|---|
 | `id` | INT AUTO_INCREMENT | Clave primaria interna. |
-| `dni` | INT UNSIGNED | Clave de cruce con `personas`. Puede no matchear hoy. |
-| `apellido` | VARCHAR(120) | Para verificación manual cuando el DNI no matchea. |
+| `dni` | INT UNSIGNED | Clave de cruce. Puede no matchear con `personas` hoy. |
+| `apellido` | VARCHAR(120) | Para verificación manual si el DNI no matchea. |
 | `nombre` | VARCHAR(120) | Ídem. |
-| `fecha_carga` | DATE | Fecha en que el listado fue incorporado a la base. |
+| `fecha_carga` | DATE | Fecha de incorporación del listado. |
 
-A estos campos se suman los específicos de cada tabla. Los campos que deben mostrarse en las vistas se agregan a las vistas correspondientes cuando se incorpora la tabla.
+**Tablas adicionales actualmente disponibles en `fiscaliz_graduados`:**
+- `padronucrpba` — afiliados a la UCR Provincia de Buenos Aires (~800.000 registros). Campos: sección, apellido, nombre, género, tipo DNI, DNI.
+- `padronucrcaba24` — afiliados a la UCR CABA (~160.000 registros). Campos: comuna, barrio, circuito, apellido, nombre, sexo, tipo DNI, DNI, dirección.
+- `auxiliarescp24` — docentes auxiliares habilitados para votar en CP que no figuran en el padrón oficial. Se mantiene como tabla permanente e independiente.
 
-**Tablas ya identificadas:**
-> **Nota:** `comuna_municipio` no existe como tabla en este esquema. El dato de municipio/comuna proviene de un listado de afiliados a un partido que el administrador tuneará y subirá cuando corresponda. En ese momento se crea la tabla y se extienden las vistas.
-
-- `sede_laboral` — sede laboral normalizada de cada DNI.
+**Tabla pendiente:**
+- `sede_laboral` — creada, vacía. Se carga cuando el administrador tenga el listado tuneado.
 
 ---
 
 ## 4. Vistas principales
 
-Las vistas son la única interfaz entre la base de datos y el PHP. El PHP hace SELECT contra las vistas; nunca consulta las tablas directamente.
-
----
+Las vistas son la única interfaz entre la base de datos y el PHP. El PHP hace SELECT contra las vistas y nunca consulta las tablas directamente. La exportación a Excel se construye dinámicamente desde el resultado de la vista sin modificar el código.
 
 ### `vista_padron_cd`
-Perfil completo de cada habilitado para votar en CD.
-
-Cruza: `padron_cd` → `personas` → `carreras` → `referentes_graduado` → `referentes` (×3) → `partidos` → `trabajos` → `participacion_electoral` (pivoteada por elección) → `sede_laboral` → `comuna_municipio` → (tablas adicionales futuras).
-
-Todos los joins son por DNI. Los joins a tablas adicionales son LEFT JOIN para que la ausencia de dato no excluya al graduado del resultado.
-
-El resultado es una fila por graduado habilitado en CD con todos sus datos disponibles en columnas. Esta vista es la fuente para la consulta en pantalla y para la exportación a Excel.
-
----
+Perfil completo de cada habilitado para votar en CD. Cruza por DNI: `padron_cd` → `referentes_graduado` → `referentes` (×3) → `persona_partido` → `partidos` → `persona_trabajo` → `trabajos` → `sede_laboral` → `participacion_electoral` (por cada elección CD). Todos los joins son LEFT JOIN.
 
 ### `vista_padron_cp`
-Ídem para el padrón CP. Misma lógica, mismas fuentes, filtra por los DNIs presentes en `padron_cp`. Incluye el campo `auxiliar` para distinguir docentes auxiliares de graduados.
+Ídem para CP. Incluye el campo `auxiliar`. Cruza participación para las 4 elecciones de CP: 2017, 2019, 2021, 2024.
 
----
+### Agregar una elección nueva
+Requiere dos operaciones sobre las vistas:
+1. Agregar el LEFT JOIN a `participacion_electoral` con el nuevo `id_eleccion`.
+2. Agregar la columna `CASE WHEN` correspondiente en el SELECT.
 
-### Vistas de participación (dentro de las vistas principales)
-La participación electoral se pivotea dentro de `vista_padron_cd` y `vista_padron_cp` para mostrar una columna por elección: `voto_2017`, `voto_2019`, `voto_2021`, `voto_2024`. Cuando se agrega una elección nueva a `elecciones` y se registra su participación en `participacion_electoral`, las vistas se actualizan para incluir la nueva columna. Es la única modificación SQL necesaria ante una nueva elección.
+El PHP no se modifica.
+
+### Agregar una tabla nueva
+Requiere una operación sobre las vistas:
+1. Agregar el LEFT JOIN a la nueva tabla por DNI.
+2. Agregar las columnas a mostrar en el SELECT.
+
+El PHP no se modifica.
 
 ---
 
 ## 5. Relaciones entre tablas
 
 ```
-personas ──────────────── padron_cd              (dni)
-personas ──────────────── padron_cp              (dni)
-personas ──────────────── referentes_graduado    (dni)
-personas ──────────────── participacion_electoral(dni)
-personas ──────────────── sede_laboral           (dni, LEFT JOIN)
-personas ──────────────── comuna_municipio       (dni, LEFT JOIN)
-personas ──────────────── tablas adicionales     (dni, LEFT JOIN)
+personas ──────────────── padron_cd               (dni)
+personas ──────────────── padron_cp               (dni)
+personas ──────────────── referentes_graduado     (dni)
+personas ──────────────── persona_partido         (dni)
+personas ──────────────── persona_trabajo         (dni)
+personas ──────────────── participacion_electoral (dni)
+personas ──────────────── sede_laboral            (dni, LEFT JOIN)
+personas ──────────────── tablas adicionales      (dni, LEFT JOIN)
 
-referentes ────────────── referentes_graduado    (id → referente_1/2/3)
-elecciones ────────────── participacion_electoral(id → id_eleccion)
-carreras ──────────────── padron_cd / padron_cp  (id → id_carrera)
-partidos ──────────────── padron_cd / padron_cp  (id → id_partido)
-trabajos ──────────────── padron_cd / padron_cp  (id → id_trabajo)
+referentes ────────────── referentes_graduado     (id → referente_1/2/3)
+partidos ──────────────── persona_partido         (id → id_partido)
+trabajos ──────────────── persona_trabajo         (id → id_trabajo)
+elecciones ────────────── participacion_electoral (id → id_eleccion)
 ```
 
 ---
 
-## 6. Lo que este esquema deja preparado para Fiscalización
+## 6. Estado de carga de datos
 
-El módulo de Fiscalización necesitará registrar votos en tiempo real durante el día de la elección. Ese módulo se diseñará en una etapa posterior. El esquema actual lo contempla sin requerir cambios en las tablas existentes:
+| Tabla | Registros | Estado |
+|---|---|---|
+| `personas` | 19.709 | ✅ Migrado |
+| `padron_cd` | 19.521 | ✅ Migrado |
+| `padron_cp` | 4.554 | ✅ Migrado |
+| `carreras` | 5 | ✅ Cargado |
+| `referentes` | 270 | ✅ Migrado |
+| `partidos` | 54 | ✅ Migrado |
+| `trabajos` | 76 | ✅ Migrado |
+| `elecciones` | 6 | ✅ Cargado |
+| `referentes_graduado` | 19.709 | ✅ Migrado |
+| `persona_partido` | 1.371 | ✅ Migrado |
+| `persona_trabajo` | 2.150 | ✅ Migrado |
+| `participacion_electoral` | 11.965 | ✅ Migrado |
+| `sede_laboral` | 0 | ⏳ Pendiente listado |
 
-- La tabla `elecciones` ya existe y tiene el campo `activa` para identificar la elección en curso.
-- La tabla `participacion_electoral` recibirá los registros del día de la elección.
-- Los padrones ya están separados por tipo (cd/cp).
-- Las tablas de mesas, fiscales y login de fiscales se agregarán como tablas nuevas en esa etapa.
+**Nota:** los datos migrados son válidos para desarrollo. La validación profunda de consistencia se realiza antes de pasar a producción.
 
 ---
 
-## 7. Lo que este esquema NO incluye todavía
+## 7. Lo que este esquema deja preparado para Fiscalización
 
-- Tablas de usuarios del sistema (administradores, niveles de acceso).
+- `elecciones` ya existe con el campo `activa` para identificar la elección en curso.
+- `participacion_electoral` recibirá los registros del día de la elección.
+- Los padrones ya están separados por tipo (cd/cp).
+- Las tablas de mesas, fiscales y login de fiscales se agregarán como tablas nuevas sin modificar las existentes.
+
+---
+
+## 8. Lo que este esquema NO incluye todavía
+
+- Tablas de usuarios del sistema y niveles de acceso.
 - Tablas de mesas electorales y fiscales.
 - Registro en tiempo real de votos (módulo Fiscalización).
-- Script de migración desde la base actual.
-
-Todo esto se aborda en etapas posteriores.
 
 ---
 
 ## Resumen
 
-El nuevo esquema centraliza la identidad de cada individuo en `personas` (DNI, apellido, nombre), mantiene los padrones CD y CP puros tal como los entrega la facultad, reemplaza el historial electoral embebido por una tabla de participación vinculada a un catálogo de elecciones, y expone todo el dato consolidado a través de dos vistas principales que el PHP consulta directamente. Incorporar una tabla nueva implica agregarla con DNI obligatorio y extender las vistas: el código PHP no se modifica. El resultado es una base normalizada, con integridad referencial garantizada por InnoDB, preparada para crecer con nuevas fuentes de datos y para escalar al módulo de Fiscalización sin cambios estructurales.
+El nuevo esquema centraliza la identidad de cada individuo en `personas` (DNI, apellido, nombre), mantiene los padrones CD y CP puros tal como los entrega la facultad, separa los vínculos con partido y trabajo en tablas independientes actualizables vía ABM, reemplaza el historial electoral embebido por una tabla de participación donde solo figuran los que votaron, y expone todo el dato consolidado a través de dos vistas principales que el PHP consulta directamente. Incorporar una tabla nueva o una elección nueva implica extender las vistas: el código PHP no se modifica. La base está migrada y lista para el desarrollo de la etapa Consulta Padrón.
