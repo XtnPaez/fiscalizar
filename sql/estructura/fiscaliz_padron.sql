@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: localhost:3306
--- Tiempo de generación: 11-03-2026 a las 11:44:20
+-- Tiempo de generación: 14-03-2026 a las 04:54:29
 -- Versión del servidor: 10.6.20-MariaDB-cll-lve
 -- Versión de PHP: 8.1.34
 
@@ -28,10 +28,10 @@ SET time_zone = "+00:00";
 --
 
 CREATE TABLE `carreras` (
-  `id` int(11) NOT NULL,
+  `id` int(11) NOT NULL COMMENT 'Sin AUTO_INCREMENT. 1-5 carreras, 99 SIN DATO.',
   `descripcion` varchar(50) NOT NULL COMMENT 'Nombre completo de la carrera',
-  `sigla` varchar(5) NOT NULL COMMENT 'Sigla. Ej: CP, CS, RT, TS, CC'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci COMMENT='Carreras de la Facultad de Ciencias Sociales UBA.';
+  `sigla` varchar(5) NOT NULL COMMENT 'Sigla. Ej: CP, CS, RT, TS, CC, SD'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci COMMENT='Carreras de la Facultad de Ciencias Sociales UBA. id=99 reservado para SIN DATO.';
 
 -- --------------------------------------------------------
 
@@ -50,25 +50,14 @@ CREATE TABLE `elecciones` (
 -- --------------------------------------------------------
 
 --
--- Estructura de tabla para la tabla `mapeo_referentes`
---
-
-CREATE TABLE `mapeo_referentes` (
-  `id_viejo` int(11) NOT NULL,
-  `id_nuevo` int(11) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
-
--- --------------------------------------------------------
-
---
 -- Estructura de tabla para la tabla `padron_cd`
 --
 
 CREATE TABLE `padron_cd` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `dni` int(10) UNSIGNED NOT NULL,
-  `apellido` varchar(120) NOT NULL,
-  `nombre` varchar(120) NOT NULL,
+  `apellido` varchar(120) NOT NULL COMMENT 'Tal como figura en el padron oficial',
+  `nombre` varchar(120) NOT NULL COMMENT 'Tal como figura en el padron oficial',
   `sigla` varchar(12) DEFAULT NULL COMMENT 'Sigla de la carrera segun el padron oficial'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci COMMENT='Padron oficial de Consejo Directivo. Estructura exacta de la facultad.';
 
@@ -81,8 +70,8 @@ CREATE TABLE `padron_cd` (
 CREATE TABLE `padron_cp` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `dni` int(10) UNSIGNED NOT NULL,
-  `apellido` varchar(120) NOT NULL,
-  `nombre` varchar(120) NOT NULL,
+  `apellido` varchar(120) NOT NULL COMMENT 'Tal como figura en el padron oficial',
+  `nombre` varchar(120) NOT NULL COMMENT 'Tal como figura en el padron oficial',
   `auxiliar` tinyint(1) NOT NULL DEFAULT 0 COMMENT '1 = docente auxiliar, 0 = graduado'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci COMMENT='Padron oficial de Ciencia Politica. Estructura exacta de la facultad mas campo auxiliar.';
 
@@ -121,8 +110,8 @@ CREATE TABLE `partidos` (
 
 CREATE TABLE `personas` (
   `dni` int(10) UNSIGNED NOT NULL,
-  `apellido` varchar(120) NOT NULL,
-  `nombre` varchar(120) NOT NULL
+  `apellido` varchar(120) NOT NULL COMMENT 'Mayusculas, sin tildes, con N',
+  `nombre` varchar(120) NOT NULL COMMENT 'Mayusculas, sin tildes, con N'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci COMMENT='Nucleo del esquema. Un registro por DNI. Nunca se elimina.';
 
 -- --------------------------------------------------------
@@ -155,8 +144,8 @@ CREATE TABLE `persona_trabajo` (
 
 CREATE TABLE `referentes` (
   `id` int(11) NOT NULL,
-  `apellido` varchar(80) NOT NULL,
-  `nombre` varchar(80) NOT NULL,
+  `apellido` varchar(80) NOT NULL COMMENT 'Apellido del referente',
+  `nombre` varchar(80) NOT NULL COMMENT 'Nombre del referente',
   `aplica_cd` tinyint(1) NOT NULL DEFAULT 1 COMMENT '1 si aplica al padron CD',
   `aplica_cp` tinyint(1) NOT NULL DEFAULT 1 COMMENT '1 si aplica al padron CP',
   `activo` tinyint(1) NOT NULL DEFAULT 1 COMMENT '1 activo, 0 baja logica'
@@ -182,13 +171,210 @@ CREATE TABLE `referentes_graduado` (
 --
 
 CREATE TABLE `sede_laboral` (
+  `dni` int(10) UNSIGNED NOT NULL,
+  `sede` varchar(200) DEFAULT NULL COMMENT 'Texto libre tal como viene de la fuente'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci COMMENT='Sede laboral por DNI. Texto libre. Un registro por DNI.';
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `st_auxiliares_cp`
+--
+
+CREATE TABLE `st_auxiliares_cp` (
+  `orden` int(11) NOT NULL,
+  `nombre` varchar(150) NOT NULL,
+  `apellido` varchar(150) NOT NULL,
+  `dni` int(11) NOT NULL,
+  `id_responsable1` int(11) DEFAULT NULL,
+  `id_responsable2` int(11) DEFAULT NULL,
+  `id_responsable3` int(11) DEFAULT NULL,
+  `id_partido` int(11) DEFAULT NULL,
+  `voto17` enum('SI','NO','SIN DATO') DEFAULT 'SIN DATO',
+  `voto19` enum('SI','NO','SIN DATO') DEFAULT 'SIN DATO',
+  `voto21` enum('SI','NO','SIN DATO') DEFAULT 'SIN DATO',
+  `id_trabajo` int(11) DEFAULT NULL,
+  `sedelaboral` varchar(200) DEFAULT NULL,
+  `comuna_municipio` varchar(150) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Staging: auxiliares CP. Subconjunto de st_padron_cp_datos para filtrado.';
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `st_carreras`
+--
+
+CREATE TABLE `st_carreras` (
   `id` int(11) NOT NULL,
-  `dni` int(10) UNSIGNED NOT NULL COMMENT 'Clave de cruce. Puede no matchear con personas hoy.',
-  `apellido` varchar(120) NOT NULL COMMENT 'Para verificacion manual si el DNI no matchea.',
-  `nombre` varchar(120) NOT NULL COMMENT 'Para verificacion manual si el DNI no matchea.',
-  `sede` varchar(120) DEFAULT NULL,
-  `fecha_carga` date NOT NULL COMMENT 'Fecha de incorporacion del listado.'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci COMMENT='Sede laboral por DNI. Se sube completo, no solo los que matchean.';
+  `carrera` varchar(100) NOT NULL,
+  `sigla` char(2) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Staging: catalogo de carreras. Fuente para poblar carreras.';
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `st_padron_cd_datos`
+--
+
+CREATE TABLE `st_padron_cd_datos` (
+  `orden` int(11) NOT NULL COMMENT 'PK. Referenciado por st_votos_cd_24.id_padron',
+  `apellido` varchar(150) NOT NULL,
+  `nombre` varchar(150) NOT NULL,
+  `sigla` char(2) NOT NULL,
+  `dni` int(11) NOT NULL,
+  `id_carrera` int(11) NOT NULL COMMENT 'id_origen de st_carreras',
+  `id_responsable1` int(11) DEFAULT NULL COMMENT 'id_origen de st_referentes',
+  `id_responsable2` int(11) DEFAULT NULL COMMENT 'id_origen de st_referentes',
+  `id_responsable3` int(11) DEFAULT NULL COMMENT 'id_origen de st_referentes',
+  `id_partido` int(11) DEFAULT NULL COMMENT 'id_origen de st_partidos',
+  `voto21` enum('SI','NO','SIN DATO') DEFAULT 'SIN DATO' COMMENT 'Se migra a participacion_electoral id_eleccion=3',
+  `id_trabajo` int(11) DEFAULT NULL COMMENT 'id_origen de st_trabajo',
+  `sedelaboral` varchar(200) DEFAULT NULL COMMENT 'Se migra a sede_laboral',
+  `comuna_municipio` varchar(150) DEFAULT NULL COMMENT 'Dato de UCR, no tiene tabla destino propia'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Staging: padron CD enriquecido. orden = clave de cruce con votos.';
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `st_padron_cp_datos`
+--
+
+CREATE TABLE `st_padron_cp_datos` (
+  `id` int(11) NOT NULL COMMENT 'PK. Referenciado por st_votos_cp_24.id_padron',
+  `dni` int(11) NOT NULL,
+  `nombre` varchar(150) NOT NULL,
+  `apellido` varchar(150) NOT NULL,
+  `carrera` char(2) NOT NULL,
+  `orden` int(11) NOT NULL,
+  `id_carrera` int(11) NOT NULL COMMENT 'id_origen de st_carreras',
+  `id_padron` int(11) DEFAULT NULL COMMENT 'Numero de orden en padron oficial externo. En desuso.',
+  `id_responsable1` int(11) DEFAULT NULL COMMENT 'id_origen de st_referentes',
+  `id_responsable2` int(11) DEFAULT NULL COMMENT 'id_origen de st_referentes',
+  `id_responsable3` int(11) DEFAULT NULL COMMENT 'id_origen de st_referentes',
+  `id_partido` int(11) DEFAULT NULL COMMENT 'id_origen de st_partidos',
+  `voto17` enum('SI','NO','SIN DATO') DEFAULT 'SIN DATO' COMMENT 'Se migra a participacion_electoral id_eleccion=1',
+  `voto19` enum('SI','NO','SIN DATO') DEFAULT 'SIN DATO' COMMENT 'Se migra a participacion_electoral id_eleccion=2',
+  `voto21` enum('SI','NO','SIN DATO') DEFAULT 'SIN DATO' COMMENT 'Se migra a participacion_electoral id_eleccion=4',
+  `id_trabajo` int(11) DEFAULT NULL COMMENT 'id_origen de st_trabajo',
+  `sedelaboral` varchar(200) DEFAULT NULL COMMENT 'Se migra a sede_laboral',
+  `comuna_municipio` varchar(150) DEFAULT NULL COMMENT 'Dato de UCR, no tiene tabla destino propia',
+  `auxiliar` enum('SI','NO') DEFAULT 'NO' COMMENT 'SI = docente auxiliar'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Staging: padron CP enriquecido. id = clave de cruce con votos.';
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `st_partidos`
+--
+
+CREATE TABLE `st_partidos` (
+  `id_origen` int(11) NOT NULL,
+  `partido` varchar(150) NOT NULL,
+  `cd` enum('SI','NO') NOT NULL,
+  `cp` enum('SI','NO') NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Staging: catalogo de partidos. id_origen = id de la fuente original.';
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `st_referentes`
+--
+
+CREATE TABLE `st_referentes` (
+  `id_origen` int(11) NOT NULL,
+  `apellido` varchar(150) NOT NULL,
+  `nombre` varchar(150) DEFAULT NULL,
+  `cp` enum('SI','NO') NOT NULL,
+  `cd` enum('SI','NO') NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Staging: catalogo de referentes. id_origen = id de la fuente original.';
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `st_siet_2026`
+--
+
+CREATE TABLE `st_siet_2026` (
+  `id` int(11) NOT NULL,
+  `dni` int(11) NOT NULL,
+  `apellido` varchar(150) NOT NULL,
+  `nombre` varchar(150) NOT NULL,
+  `mail` varchar(200) DEFAULT NULL,
+  `facultad` varchar(150) DEFAULT NULL,
+  `titulo` varchar(300) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Staging: empleados UBA SIET 2026. Cruce por DNI.';
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `st_trabajo`
+--
+
+CREATE TABLE `st_trabajo` (
+  `id_origen` int(11) NOT NULL,
+  `trabajo` varchar(200) NOT NULL,
+  `cd` enum('SI','NO') NOT NULL,
+  `cp` enum('SI','NO') NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Staging: catalogo de trabajos. id_origen = id de la fuente original.';
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `st_ucr_caba_2026`
+--
+
+CREATE TABLE `st_ucr_caba_2026` (
+  `id` int(11) NOT NULL,
+  `seccion` varchar(50) NOT NULL COMMENT 'Equivale a comuna',
+  `circuito` int(11) NOT NULL,
+  `apellido` varchar(150) NOT NULL,
+  `nombre` varchar(150) NOT NULL,
+  `genero` char(1) DEFAULT NULL,
+  `dni` int(11) DEFAULT NULL,
+  `domicilio` varchar(255) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Staging: afiliados UCR CABA 2026. seccion = comuna. Cruce por DNI.';
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `st_ucr_pba_2024`
+--
+
+CREATE TABLE `st_ucr_pba_2024` (
+  `id` int(11) NOT NULL,
+  `dni` int(11) NOT NULL,
+  `apellido` varchar(150) NOT NULL,
+  `nombre` varchar(150) NOT NULL,
+  `seccion` varchar(150) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Staging: afiliados UCR PBA 2024. Cruce por DNI.';
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `st_votos_cd_24`
+--
+
+CREATE TABLE `st_votos_cd_24` (
+  `id` int(11) NOT NULL,
+  `id_mesas` int(11) NOT NULL,
+  `id_padron` int(11) NOT NULL COMMENT 'Referencia st_padron_cd_datos.orden',
+  `id_tipovoto` int(11) NOT NULL COMMENT 'Reservado para Fiscalizacion',
+  `id_usuarios` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Staging: votos CD 2024. id_padron -> st_padron_cd_datos.orden -> DNI.';
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `st_votos_cp_24`
+--
+
+CREATE TABLE `st_votos_cp_24` (
+  `id` int(11) NOT NULL,
+  `id_mesas` int(11) NOT NULL,
+  `id_padron` int(11) NOT NULL COMMENT 'Referencia st_padron_cp_datos.id',
+  `id_tipovoto` int(11) NOT NULL COMMENT 'Reservado para Fiscalizacion',
+  `id_usuarios` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Staging: votos CP 2024. id_padron -> st_padron_cp_datos.id -> DNI.';
 
 -- --------------------------------------------------------
 
@@ -207,6 +393,20 @@ CREATE TABLE `trabajos` (
 -- --------------------------------------------------------
 
 --
+-- Estructura de tabla para la tabla `usuarios`
+--
+
+CREATE TABLE `usuarios` (
+  `id` int(11) NOT NULL,
+  `usuario` varchar(60) NOT NULL,
+  `password` varchar(255) NOT NULL COMMENT 'Hash bcrypt',
+  `nivel` enum('consulta','admin','superadmin') NOT NULL DEFAULT 'consulta',
+  `activo` tinyint(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci COMMENT='Usuarios del modulo Consulta Padron.';
+
+-- --------------------------------------------------------
+
+--
 -- Estructura Stand-in para la vista `vista_padron_cd`
 -- (Véase abajo para la vista actual)
 --
@@ -220,7 +420,7 @@ CREATE TABLE `vista_padron_cd` (
 ,`referente_3` varchar(161)
 ,`partido` varchar(80)
 ,`trabajo` varchar(120)
-,`sede_laboral` varchar(120)
+,`sede_laboral` varchar(200)
 ,`voto_cd_2021` varchar(2)
 ,`voto_cd_2024` varchar(2)
 );
@@ -241,7 +441,7 @@ CREATE TABLE `vista_padron_cp` (
 ,`referente_3` varchar(161)
 ,`partido` varchar(80)
 ,`trabajo` varchar(120)
-,`sede_laboral` varchar(120)
+,`sede_laboral` varchar(200)
 ,`voto_cp_2017` varchar(2)
 ,`voto_cp_2019` varchar(2)
 ,`voto_cp_2021` varchar(2)
@@ -255,7 +455,7 @@ CREATE TABLE `vista_padron_cp` (
 --
 DROP TABLE IF EXISTS `vista_padron_cd`;
 
-CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vista_padron_cd`  AS SELECT `pcd`.`dni` AS `dni`, `pcd`.`apellido` AS `apellido`, `pcd`.`nombre` AS `nombre`, `pcd`.`sigla` AS `carrera`, concat(`r1`.`apellido`,' ',`r1`.`nombre`) AS `referente_1`, concat(`r2`.`apellido`,' ',`r2`.`nombre`) AS `referente_2`, concat(`r3`.`apellido`,' ',`r3`.`nombre`) AS `referente_3`, `pt`.`nombre` AS `partido`, `tr`.`nombre` AS `trabajo`, `sl`.`sede` AS `sede_laboral`, CASE WHEN `pe21cd`.`dni` is not null THEN 'SI' ELSE 'NO' END AS `voto_cd_2021`, CASE WHEN `pe24cd`.`dni` is not null THEN 'SI' ELSE 'NO' END AS `voto_cd_2024` FROM (((((((((((`padron_cd` `pcd` left join `referentes_graduado` `rg` on(`pcd`.`dni` = `rg`.`dni`)) left join `referentes` `r1` on(`rg`.`referente_1` = `r1`.`id`)) left join `referentes` `r2` on(`rg`.`referente_2` = `r2`.`id`)) left join `referentes` `r3` on(`rg`.`referente_3` = `r3`.`id`)) left join `persona_partido` `pp` on(`pcd`.`dni` = `pp`.`dni`)) left join `partidos` `pt` on(`pp`.`id_partido` = `pt`.`id`)) left join `persona_trabajo` `ptt` on(`pcd`.`dni` = `ptt`.`dni`)) left join `trabajos` `tr` on(`ptt`.`id_trabajo` = `tr`.`id`)) left join `sede_laboral` `sl` on(`pcd`.`dni` = `sl`.`dni`)) left join `participacion_electoral` `pe21cd` on(`pcd`.`dni` = `pe21cd`.`dni` and `pe21cd`.`id_eleccion` = 3)) left join `participacion_electoral` `pe24cd` on(`pcd`.`dni` = `pe24cd`.`dni` and `pe24cd`.`id_eleccion` = 5)) ORDER BY `pcd`.`apellido` ASC, `pcd`.`nombre` ASC ;
+CREATE ALGORITHM=UNDEFINED DEFINER=`cpses_fipt8qn9de`@`localhost` SQL SECURITY DEFINER VIEW `vista_padron_cd`  AS SELECT `pcd`.`dni` AS `dni`, `pcd`.`apellido` AS `apellido`, `pcd`.`nombre` AS `nombre`, `pcd`.`sigla` AS `carrera`, concat(`r1`.`apellido`,' ',`r1`.`nombre`) AS `referente_1`, concat(`r2`.`apellido`,' ',`r2`.`nombre`) AS `referente_2`, concat(`r3`.`apellido`,' ',`r3`.`nombre`) AS `referente_3`, `pt`.`nombre` AS `partido`, `tr`.`nombre` AS `trabajo`, `sl`.`sede` AS `sede_laboral`, CASE WHEN `pe21cd`.`dni` is not null THEN 'SI' ELSE 'NO' END AS `voto_cd_2021`, CASE WHEN `pe24cd`.`dni` is not null THEN 'SI' ELSE 'NO' END AS `voto_cd_2024` FROM (((((((((((`padron_cd` `pcd` left join `referentes_graduado` `rg` on(`pcd`.`dni` = `rg`.`dni`)) left join `referentes` `r1` on(`rg`.`referente_1` = `r1`.`id`)) left join `referentes` `r2` on(`rg`.`referente_2` = `r2`.`id`)) left join `referentes` `r3` on(`rg`.`referente_3` = `r3`.`id`)) left join `persona_partido` `pp` on(`pcd`.`dni` = `pp`.`dni`)) left join `partidos` `pt` on(`pp`.`id_partido` = `pt`.`id`)) left join `persona_trabajo` `ptt` on(`pcd`.`dni` = `ptt`.`dni`)) left join `trabajos` `tr` on(`ptt`.`id_trabajo` = `tr`.`id`)) left join `sede_laboral` `sl` on(`pcd`.`dni` = `sl`.`dni`)) left join `participacion_electoral` `pe21cd` on(`pcd`.`dni` = `pe21cd`.`dni` and `pe21cd`.`id_eleccion` = 3)) left join `participacion_electoral` `pe24cd` on(`pcd`.`dni` = `pe24cd`.`dni` and `pe24cd`.`id_eleccion` = 5)) ORDER BY `pcd`.`apellido` ASC, `pcd`.`nombre` ASC ;
 
 -- --------------------------------------------------------
 
@@ -264,7 +464,7 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 --
 DROP TABLE IF EXISTS `vista_padron_cp`;
 
-CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vista_padron_cp`  AS SELECT `pcp`.`dni` AS `dni`, `pcp`.`apellido` AS `apellido`, `pcp`.`nombre` AS `nombre`, `pcp`.`auxiliar` AS `auxiliar`, concat(`r1`.`apellido`,' ',`r1`.`nombre`) AS `referente_1`, concat(`r2`.`apellido`,' ',`r2`.`nombre`) AS `referente_2`, concat(`r3`.`apellido`,' ',`r3`.`nombre`) AS `referente_3`, `pt`.`nombre` AS `partido`, `tr`.`nombre` AS `trabajo`, `sl`.`sede` AS `sede_laboral`, CASE WHEN `pe17`.`dni` is not null THEN 'SI' ELSE 'NO' END AS `voto_cp_2017`, CASE WHEN `pe19`.`dni` is not null THEN 'SI' ELSE 'NO' END AS `voto_cp_2019`, CASE WHEN `pe21`.`dni` is not null THEN 'SI' ELSE 'NO' END AS `voto_cp_2021`, CASE WHEN `pe24`.`dni` is not null THEN 'SI' ELSE 'NO' END AS `voto_cp_2024` FROM (((((((((((((`padron_cp` `pcp` left join `referentes_graduado` `rg` on(`pcp`.`dni` = `rg`.`dni`)) left join `referentes` `r1` on(`rg`.`referente_1` = `r1`.`id`)) left join `referentes` `r2` on(`rg`.`referente_2` = `r2`.`id`)) left join `referentes` `r3` on(`rg`.`referente_3` = `r3`.`id`)) left join `persona_partido` `pp` on(`pcp`.`dni` = `pp`.`dni`)) left join `partidos` `pt` on(`pp`.`id_partido` = `pt`.`id`)) left join `persona_trabajo` `ptt` on(`pcp`.`dni` = `ptt`.`dni`)) left join `trabajos` `tr` on(`ptt`.`id_trabajo` = `tr`.`id`)) left join `sede_laboral` `sl` on(`pcp`.`dni` = `sl`.`dni`)) left join `participacion_electoral` `pe17` on(`pcp`.`dni` = `pe17`.`dni` and `pe17`.`id_eleccion` = 1)) left join `participacion_electoral` `pe19` on(`pcp`.`dni` = `pe19`.`dni` and `pe19`.`id_eleccion` = 2)) left join `participacion_electoral` `pe21` on(`pcp`.`dni` = `pe21`.`dni` and `pe21`.`id_eleccion` = 4)) left join `participacion_electoral` `pe24` on(`pcp`.`dni` = `pe24`.`dni` and `pe24`.`id_eleccion` = 6)) ORDER BY `pcp`.`apellido` ASC, `pcp`.`nombre` ASC ;
+CREATE ALGORITHM=UNDEFINED DEFINER=`cpses_fipt8qn9de`@`localhost` SQL SECURITY DEFINER VIEW `vista_padron_cp`  AS SELECT `pcp`.`dni` AS `dni`, `pcp`.`apellido` AS `apellido`, `pcp`.`nombre` AS `nombre`, `pcp`.`auxiliar` AS `auxiliar`, concat(`r1`.`apellido`,' ',`r1`.`nombre`) AS `referente_1`, concat(`r2`.`apellido`,' ',`r2`.`nombre`) AS `referente_2`, concat(`r3`.`apellido`,' ',`r3`.`nombre`) AS `referente_3`, `pt`.`nombre` AS `partido`, `tr`.`nombre` AS `trabajo`, `sl`.`sede` AS `sede_laboral`, CASE WHEN `pe17`.`dni` is not null THEN 'SI' ELSE 'NO' END AS `voto_cp_2017`, CASE WHEN `pe19`.`dni` is not null THEN 'SI' ELSE 'NO' END AS `voto_cp_2019`, CASE WHEN `pe21`.`dni` is not null THEN 'SI' ELSE 'NO' END AS `voto_cp_2021`, CASE WHEN `pe24`.`dni` is not null THEN 'SI' ELSE 'NO' END AS `voto_cp_2024` FROM (((((((((((((`padron_cp` `pcp` left join `referentes_graduado` `rg` on(`pcp`.`dni` = `rg`.`dni`)) left join `referentes` `r1` on(`rg`.`referente_1` = `r1`.`id`)) left join `referentes` `r2` on(`rg`.`referente_2` = `r2`.`id`)) left join `referentes` `r3` on(`rg`.`referente_3` = `r3`.`id`)) left join `persona_partido` `pp` on(`pcp`.`dni` = `pp`.`dni`)) left join `partidos` `pt` on(`pp`.`id_partido` = `pt`.`id`)) left join `persona_trabajo` `ptt` on(`pcp`.`dni` = `ptt`.`dni`)) left join `trabajos` `tr` on(`ptt`.`id_trabajo` = `tr`.`id`)) left join `sede_laboral` `sl` on(`pcp`.`dni` = `sl`.`dni`)) left join `participacion_electoral` `pe17` on(`pcp`.`dni` = `pe17`.`dni` and `pe17`.`id_eleccion` = 1)) left join `participacion_electoral` `pe19` on(`pcp`.`dni` = `pe19`.`dni` and `pe19`.`id_eleccion` = 2)) left join `participacion_electoral` `pe21` on(`pcp`.`dni` = `pe21`.`dni` and `pe21`.`id_eleccion` = 4)) left join `participacion_electoral` `pe24` on(`pcp`.`dni` = `pe24`.`dni` and `pe24`.`id_eleccion` = 6)) ORDER BY `pcp`.`apellido` ASC, `pcp`.`nombre` ASC ;
 
 --
 -- Índices para tablas volcadas
@@ -282,12 +482,6 @@ ALTER TABLE `carreras`
 --
 ALTER TABLE `elecciones`
   ADD PRIMARY KEY (`id`);
-
---
--- Indices de la tabla `mapeo_referentes`
---
-ALTER TABLE `mapeo_referentes`
-  ADD PRIMARY KEY (`id_viejo`);
 
 --
 -- Indices de la tabla `padron_cd`
@@ -356,8 +550,122 @@ ALTER TABLE `referentes_graduado`
 -- Indices de la tabla `sede_laboral`
 --
 ALTER TABLE `sede_laboral`
+  ADD PRIMARY KEY (`dni`);
+
+--
+-- Indices de la tabla `st_auxiliares_cp`
+--
+ALTER TABLE `st_auxiliares_cp`
+  ADD PRIMARY KEY (`orden`),
+  ADD KEY `idx_dni` (`dni`),
+  ADD KEY `idx_partido` (`id_partido`),
+  ADD KEY `idx_trabajo` (`id_trabajo`);
+
+--
+-- Indices de la tabla `st_carreras`
+--
+ALTER TABLE `st_carreras`
   ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_sede_laboral_dni` (`dni`);
+  ADD UNIQUE KEY `uk_sigla` (`sigla`);
+
+--
+-- Indices de la tabla `st_padron_cd_datos`
+--
+ALTER TABLE `st_padron_cd_datos`
+  ADD PRIMARY KEY (`orden`),
+  ADD KEY `idx_dni` (`dni`),
+  ADD KEY `idx_carrera` (`id_carrera`),
+  ADD KEY `idx_partido` (`id_partido`),
+  ADD KEY `idx_trabajo` (`id_trabajo`),
+  ADD KEY `idx_responsable1` (`id_responsable1`),
+  ADD KEY `idx_responsable2` (`id_responsable2`),
+  ADD KEY `idx_responsable3` (`id_responsable3`);
+
+--
+-- Indices de la tabla `st_padron_cp_datos`
+--
+ALTER TABLE `st_padron_cp_datos`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_dni` (`dni`),
+  ADD KEY `idx_carrera` (`id_carrera`),
+  ADD KEY `idx_padron` (`id_padron`),
+  ADD KEY `idx_partido` (`id_partido`),
+  ADD KEY `idx_trabajo` (`id_trabajo`),
+  ADD KEY `idx_responsable1` (`id_responsable1`),
+  ADD KEY `idx_responsable2` (`id_responsable2`),
+  ADD KEY `idx_responsable3` (`id_responsable3`);
+
+--
+-- Indices de la tabla `st_partidos`
+--
+ALTER TABLE `st_partidos`
+  ADD PRIMARY KEY (`id_origen`),
+  ADD UNIQUE KEY `uk_partido` (`partido`);
+
+--
+-- Indices de la tabla `st_referentes`
+--
+ALTER TABLE `st_referentes`
+  ADD PRIMARY KEY (`id_origen`),
+  ADD KEY `idx_apellido` (`apellido`),
+  ADD KEY `idx_nombre` (`nombre`),
+  ADD KEY `idx_cp` (`cp`),
+  ADD KEY `idx_cd` (`cd`);
+
+--
+-- Indices de la tabla `st_siet_2026`
+--
+ALTER TABLE `st_siet_2026`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_dni` (`dni`),
+  ADD KEY `idx_apellido` (`apellido`);
+
+--
+-- Indices de la tabla `st_trabajo`
+--
+ALTER TABLE `st_trabajo`
+  ADD PRIMARY KEY (`id_origen`),
+  ADD KEY `idx_trabajo` (`trabajo`),
+  ADD KEY `idx_cd` (`cd`),
+  ADD KEY `idx_cp` (`cp`);
+
+--
+-- Indices de la tabla `st_ucr_caba_2026`
+--
+ALTER TABLE `st_ucr_caba_2026`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_dni` (`dni`),
+  ADD KEY `idx_apellido` (`apellido`),
+  ADD KEY `idx_circuito` (`circuito`);
+
+--
+-- Indices de la tabla `st_ucr_pba_2024`
+--
+ALTER TABLE `st_ucr_pba_2024`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_dni` (`dni`),
+  ADD KEY `idx_apellido` (`apellido`),
+  ADD KEY `idx_seccion` (`seccion`);
+
+--
+-- Indices de la tabla `st_votos_cd_24`
+--
+ALTER TABLE `st_votos_cd_24`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_mesas` (`id_mesas`),
+  ADD KEY `idx_padron` (`id_padron`),
+  ADD KEY `idx_tipovoto` (`id_tipovoto`),
+  ADD KEY `idx_usuarios` (`id_usuarios`);
+
+--
+-- Indices de la tabla `st_votos_cp_24`
+--
+ALTER TABLE `st_votos_cp_24`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_mesas` (`id_mesas`),
+  ADD KEY `idx_padron` (`id_padron`),
+  ADD KEY `idx_tipovoto` (`id_tipovoto`),
+  ADD KEY `idx_usuarios` (`id_usuarios`);
 
 --
 -- Indices de la tabla `trabajos`
@@ -366,14 +674,15 @@ ALTER TABLE `trabajos`
   ADD PRIMARY KEY (`id`);
 
 --
--- AUTO_INCREMENT de las tablas volcadas
+-- Indices de la tabla `usuarios`
 --
+ALTER TABLE `usuarios`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uk_usuarios_usuario` (`usuario`);
 
 --
--- AUTO_INCREMENT de la tabla `carreras`
+-- AUTO_INCREMENT de las tablas volcadas
 --
-ALTER TABLE `carreras`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT de la tabla `elecciones`
@@ -412,15 +721,33 @@ ALTER TABLE `referentes`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT de la tabla `sede_laboral`
+-- AUTO_INCREMENT de la tabla `st_siet_2026`
 --
-ALTER TABLE `sede_laboral`
+ALTER TABLE `st_siet_2026`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT de la tabla `st_ucr_caba_2026`
+--
+ALTER TABLE `st_ucr_caba_2026`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT de la tabla `st_ucr_pba_2024`
+--
+ALTER TABLE `st_ucr_pba_2024`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT de la tabla `trabajos`
 --
 ALTER TABLE `trabajos`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT de la tabla `usuarios`
+--
+ALTER TABLE `usuarios`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
@@ -468,6 +795,12 @@ ALTER TABLE `referentes_graduado`
   ADD CONSTRAINT `fk_rg_referente_1` FOREIGN KEY (`referente_1`) REFERENCES `referentes` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_rg_referente_2` FOREIGN KEY (`referente_2`) REFERENCES `referentes` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_rg_referente_3` FOREIGN KEY (`referente_3`) REFERENCES `referentes` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+--
+-- Filtros para la tabla `sede_laboral`
+--
+ALTER TABLE `sede_laboral`
+  ADD CONSTRAINT `fk_sl_personas` FOREIGN KEY (`dni`) REFERENCES `personas` (`dni`) ON UPDATE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

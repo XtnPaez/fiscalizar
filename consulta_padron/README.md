@@ -107,7 +107,7 @@ Si no hay parámetro `mod`, carga el buscador por defecto. Si el usuario no est�
 
 ## 6. Autenticación y sesiones
 
-Sistema de login propio, independiente del módulo de Fiscalización. Los usuarios viven en una tabla `usuarios` de la misma base `fiscaliz_padron`.
+Sistema de login propio, independiente del módulo de Fiscalización. Los usuarios viven en la tabla `usuarios` de la base `fiscaliz_padron`.
 
 ### Tabla `usuarios`
 
@@ -209,7 +209,7 @@ Página con tabla de listados disponibles. Nombre, descripción breve y botones 
 | Padrón CD oficial | `padron_cd` | DNI, apellido, nombre, sigla. |
 | Padrón CP oficial | `padron_cp` | DNI, apellido, nombre, auxiliar. |
 | Padrón CD completo | `vista_padron_cd` | Con referentes, partido, trabajo, votos. |
-| Padrón CP completo | `vista_padron_cp` | Ídem para CP. |
+| Padrón CP completo | `vista_padron_cp` | Idem para CP. |
 
 Los listados se definen en un array de configuración dentro del módulo. Agregar uno nuevo no requiere modificar código fuera de ese array.
 
