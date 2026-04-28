@@ -1,0 +1,87 @@
+/*
+ * assets/css/estilos.css
+ * Estilos globales del sistema Fiscalizar — Consulta Padron.
+ * Bootstrap 5 se carga desde CDN. Aqui solo estilos propios.
+ */
+
+/* Variables del sistema */
+:root {
+    --color-fondo:      #f0f2f5;
+    --color-navbar:     #1a1a2e;
+    --color-acento:     #a6d900;
+    --color-texto:      #1a1a2e;
+    --color-secundario: #4a5568;
+}
+
+/* Layout sticky footer */
+html {
+    height: 100%;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--color-fondo);
+    color: var(--color-texto);
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1;
+}
+
+/* Tablas */
+.table thead th {
+    background-color: var(--color-navbar);
+    color: #ffffff;
+    font-size: 0.82rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    border: none;
+}
+
+.table tbody td {
+    font-size: 0.88rem;
+    vertical-align: middle;
+    color: var(--color-texto);
+}
+
+.table tbody tr:hover {
+    background-color: rgba(166, 217, 0, 0.08);
+}
+
+/* Botones con acento */
+.btn-acento {
+    background-color: var(--color-acento);
+    border: none;
+    color: var(--color-navbar);
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.btn-acento:hover {
+    opacity: 0.88;
+    color: var(--color-navbar);
+}
+
+/* Titulos de modulo */
+.modulo-titulo {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--color-navbar);
+    margin-bottom: 1.25rem;
+}
+
+/* Badges de nivel de usuario en navbar */
+.badge-nivel {
+    background-color: var(--color-acento);
+    color: var(--color-navbar);
+    font-size: 0.7rem;
+}
+
+/* Alertas de error de acceso */
+.alerta-acceso {
+    font-size: 0.875rem;
+    border-radius: 6px;
+}
