@@ -1,0 +1,10 @@
+{
+    "name": "fiscalizar/consulta-padron",
+    "description": "Consulta y fiscalización de padrones electorales - Facultad de Ciencias Sociales UBA",
+    "require": {
+        "phpoffice/phpspreadsheet": "^2.0"
+    },
+    "config": {
+        "vendor-dir": "vendor"
+    }
+}

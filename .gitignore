@@ -1,0 +1,17 @@
+# Credenciales de base de datos
+config/db.php
+
+# Dependencias de Composer (PhpSpreadsheet)
+vendor/
+composer.lock
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Logs de PHP
+*.log
+
+# Archivos de entorno locales
+*.env
+.env

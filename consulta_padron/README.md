@@ -1,94 +1,105 @@
-# Consulta Padrón
+# Consulta Padron
 
-**Proyecto:** Fiscalizar  
-**Fecha:** Marzo 2026  
-**Etapa:** Consulta Padrón — diseño previo al desarrollo
+![Estado](https://img.shields.io/badge/estado-en_desarrollo-blue)
+![PHP](https://img.shields.io/badge/PHP-8.1-777BB4)
+![Bootstrap](https://img.shields.io/badge/Bootstrap-5-7952B3)
+![PhpSpreadsheet](https://img.shields.io/badge/PhpSpreadsheet-2.0-217346)
 
----
+Primera etapa del sistema Fiscalizar. Aplicacion web en PHP puro para consultar, filtrar y exportar los padrones electorales de la Facultad de Ciencias Sociales (UBA).
 
-## 1. Contexto
-
-Consulta Padrón es la primera etapa del sistema Fiscalizar. Es una aplicación web en PHP puro que permite consultar, filtrar y exportar los padrones electorales de la Facultad de Ciencias Sociales (UBA). Se desarrolla en entorno local y se despliega en un subdominio para aprobación antes de pasar a producción.
-
-La aplicación consume exclusivamente las vistas `vista_padron_cd` y `vista_padron_cp` de la base `fiscaliz_padron`. Nunca consulta tablas directamente.
+La aplicacion consume exclusivamente las vistas vista_padron_cd y vista_padron_cp de la base fiscaliz_padron. Nunca consulta tablas directamente.
 
 ---
 
-## 2. Entorno de desarrollo y deploy
+## Entorno
 
 | Etapa | Entorno |
 |---|---|
-| Desarrollo | Local |
-| Aprobación | Subdominio de fiscalizar.com.ar |
-| Producción | A definir al momento del pase |
+| Desarrollo | Local — XAMPP en C:\xampp\htdocs\fiscalizar\consulta_padron |
+| Aprobacion | Subdominio de fiscalizar.com.ar |
+| Produccion | A definir al momento del pase |
 
-Stack: PHP 8.1, MariaDB 10.6, Bootstrap 5, HTML + JavaScript nativo. Sin frameworks PHP.
+Stack: PHP 8.1, MariaDB 10.6, Bootstrap 5, JavaScript nativo, PhpSpreadsheet via Composer. Sin frameworks PHP.
 
 ---
 
-## 3. Diseño visual
+## Instalacion local
 
-**Framework CSS:** Bootstrap 5 cargado desde CDN.  
-**Fuente:** Inter (Google Fonts). Moderna, legible, ideal para pantallas de datos.  
-**Esquema de color:**
+Ver [docs/instalacion.md](../docs/instalacion.md) para instrucciones completas paso a paso.
 
-| Elemento | Color |
+Resumen:
+
+1. Clonar el repositorio en C:\xampp\htdocs\fiscalizar
+2. Copiar config/db.example.php como config/db.php y completar con credenciales locales
+3. Ejecutar composer install dentro de consulta_padron/
+4. Importar fiscaliz_padron.sql en phpMyAdmin
+5. Acceder desde http://localhost/fiscalizar/consulta_padron/
+
+---
+
+## Diseño visual
+
+| Elemento | Valor |
 |---|---|
-| Navbar y footer | `#1a1a2e` (azul muy oscuro) |
-| Acento principal | `#4f8ef7` (azul medio) |
-| Fondo de página | `#f0f2f5` (gris claro) |
-| Texto principal | `#1a1a2e` |
-| Texto secundario | `#4a5568` |
+| Framework CSS | Bootstrap 5 via CDN |
+| Fuente | Inter via Google Fonts |
+| Navbar y footer | #1a1a2e (azul muy oscuro) |
+| Acento principal | #4f8ef7 (azul medio) |
+| Fondo de pagina | #f0f2f5 (gris claro) |
+| Texto principal | #1a1a2e |
+| Texto secundario | #4a5568 |
 
-**Principio de diseño:** el sistema es una herramienta de trabajo. Todo lo que se ve en pantalla es un listado tabular, igual a lo que se va a descargar en Excel. Sin fichas, sin cajas decorativas, sin cards. La información al frente.
+Principio de diseño: el sistema es una herramienta de trabajo. Todo lo que se ve en pantalla es un listado tabular, igual a lo que se va a descargar en Excel. Sin fichas, sin cajas decorativas, sin cards. La informacion al frente.
 
 ---
 
-## 4. Estructura de carpetas
+## Estructura de carpetas
 
 ```
 consulta_padron/
-├── README.md                   # Este archivo
-├── index.php                   # Entry point. Maneja el routing y la sesion.
+├── README.md
+├── composer.json
+├── index.php
 ├── config/
-│   └── db.php                  # Conexion a la base de datos. Un solo lugar.
+│   ├── db.php
+│   └── db.example.php
 ├── includes/
-│   ├── auth.php                # Funciones de autenticacion y control de sesion.
-│   ├── navbar.php              # Navbar superior. Se incluye en todas las paginas.
-│   ├── footer.php              # Footer. Se incluye en todas las paginas.
-│   ├── funciones.php           # Funciones utilitarias generales.
-│   └── excel.php               # Funcion de exportacion a Excel.
+│   ├── auth.php
+│   ├── navbar.php
+│   ├── footer.php
+│   ├── funciones.php
+│   └── excel.php
 ├── modulos/
 │   ├── login/
-│   │   └── login.php           # Formulario de login y cierre de sesion.
+│   │   └── login.php
 │   ├── buscador/
-│   │   └── buscador.php        # Busqueda por apellido o DNI. Resultados y perfil.
+│   │   └── buscador.php
 │   ├── listados/
-│   │   └── listados.php        # Listados predefinidos paginados con descarga Excel.
+│   │   └── listados.php
 │   ├── filtros/
-│   │   └── filtros.php         # Filtros combinados con descarga Excel.
+│   │   └── filtros.php
 │   ├── abm_referentes/
-│   │   └── abm_referentes.php  # ABM del catalogo de referentes.
+│   │   └── abm_referentes.php
 │   ├── abm_partidos/
-│   │   └── abm_partidos.php    # ABM del catalogo de partidos.
+│   │   └── abm_partidos.php
 │   ├── abm_trabajos/
-│   │   └── abm_trabajos.php    # ABM del catalogo de trabajos.
+│   │   └── abm_trabajos.php
 │   ├── abm_personas/
-│   │   └── abm_personas.php    # Busqueda de persona y edicion de vinculos.
+│   │   └── abm_personas.php
 │   └── abm_usuarios/
-│       └── abm_usuarios.php    # ABM de usuarios. Solo superadmin.
+│       └── abm_usuarios.php
 └── assets/
     ├── css/
-    │   └── estilos.css         # Estilos propios sobre Bootstrap.
+    │   └── estilos.css
     └── js/
-        └── main.js             # JavaScript general.
+        └── main.js
 ```
 
 ---
 
-## 5. Routing
+## Routing
 
-No hay framework de routing. `index.php` recibe todos los requests y decide qué módulo cargar según el parámetro `mod` en la URL.
+No hay framework de routing. index.php recibe todos los requests y decide que modulo cargar segun el parametro mod en la URL.
 
 ```
 /?mod=buscador
@@ -101,223 +112,112 @@ No hay framework de routing. `index.php` recibe todos los requests y decide qué
 /?mod=abm_usuarios
 ```
 
-Si no hay parámetro `mod`, carga el buscador por defecto. Si el usuario no está autenticado, redirige al login.
+Sin parametro mod carga el buscador por defecto. Sin sesion activa redirige al login.
 
 ---
 
-## 6. Autenticación y sesiones
+## Autenticacion
 
-Sistema de login propio, independiente del módulo de Fiscalización. Los usuarios viven en la tabla `usuarios` de la base `fiscaliz_padron`.
-
-### Tabla `usuarios`
-
-```sql
-CREATE TABLE `usuarios` (
-    `id`        INT             NOT NULL AUTO_INCREMENT,
-    `usuario`   VARCHAR(60)     NOT NULL,
-    `password`  VARCHAR(255)    NOT NULL COMMENT 'Hash bcrypt',
-    `nivel`     ENUM('consulta','admin','superadmin') NOT NULL DEFAULT 'consulta',
-    `activo`    TINYINT(1)      NOT NULL DEFAULT 1,
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_usuarios_usuario` (`usuario`)
-) ENGINE=InnoDB
-  DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_spanish_ci
-  COMMENT='Usuarios del modulo Consulta Padron.';
-```
-
-### Niveles de acceso
+Sistema de login propio, independiente del modulo de Fiscalizacion. Los usuarios viven en la tabla usuarios de fiscaliz_padron.
 
 | Nivel | Puede hacer |
 |---|---|
-| `consulta` | Buscador, listados, filtros. Solo lectura. |
-| `admin` | Todo lo anterior más ABM de referentes, partidos, trabajos y personas. |
-| `superadmin` | Todo lo anterior más ABM de usuarios. Hay uno solo, creado directamente en la base. |
+| consulta | Buscador, listados, filtros. Solo lectura. |
+| admin | Todo lo anterior mas ABM de referentes, partidos, trabajos y personas. |
+| superadmin | Todo lo anterior mas ABM de usuarios. Hay uno solo. |
 
-### Navbar según nivel
+El navbar muestra solo los items a los que el usuario tiene acceso.
 
-El navbar muestra solo los ítems a los que el usuario tiene acceso. El dropdown ABM no aparece para `consulta`. El ítem Usuarios dentro del dropdown solo aparece para `superadmin`.
+auth.php expone tres funciones:
 
-### Control de sesión
-
-`auth.php` expone tres funciones:
-- `verificar_sesion()` — si no hay sesión activa, redirige al login.
-- `verificar_admin()` — si el usuario no es `admin` ni `superadmin`, redirige con error.
-- `verificar_superadmin()` — si el usuario no es `superadmin`, redirige con error.
-
-Todo módulo llama a `verificar_sesion()` al inicio. Los módulos ABM además llaman a `verificar_admin()`. El módulo ABM Usuarios llama a `verificar_superadmin()`.
+- verificar_sesion() — si no hay sesion activa, redirige al login.
+- verificar_admin() — si el usuario no es admin ni superadmin, redirige con error.
+- verificar_superadmin() — si el usuario no es superadmin, redirige con error.
 
 ---
 
-## 7. Conexión a la base de datos
+## Modulos
 
-Un único archivo `config/db.php` establece la conexión con PDO. Todos los módulos lo incluyen. Nunca se repite la cadena de conexión. Siempre prepared statements. Nunca concatenación de variables en queries.
-
----
-
-## 8. Navbar y footer
-
-Archivos separados incluidos en todas las páginas. Si cambia el logo, un ítem del menú o el texto del footer, se toca un solo archivo.
-
-**Navbar:** fondo `#1a1a2e`, ítems de navegación directos, dropdown ABM condicional según nivel, usuario activo y botón Salir a la derecha.
-
-**Footer:** fondo `#1a1a2e`, texto mínimo: nombre del sistema, institución, año.
-
----
-
-## 9. Módulos
-
----
-
-### 9.1 Login
-
-**Archivo:** `modulos/login/login.php`  
-**Acceso:** público
-
-Formulario con campos usuario y password. Al autenticar guarda en `$_SESSION`: `id`, `usuario`, `nivel`. Redirige al buscador. El cierre de sesión destruye la sesión y redirige al login.
-
----
-
-### 9.2 Buscador
-
-**Archivo:** `modulos/buscador/buscador.php`  
-**Acceso:** todos los niveles
-
-**Home del sistema.** Input de búsqueda centrado en pantalla. El usuario escribe apellido o DNI y presiona Buscar.
-
-Tres accesos rápidos debajo del buscador: Padrón CD completo, Padrón CP completo, Filtros avanzados.
-
-**Resultados:** tabla con columnas DNI, apellido, nombre, carrera, padrón (CD / CP / ambos) y botón Ver más por fila. Siempre descargable en Excel, aunque sea un solo resultado.
-
-**Perfil (Ver más):** listado de una sola fila con todas las columnas disponibles para ese DNI: referentes, partido, trabajo, sede laboral, participación histórica. Mismo formato tabular que cualquier otro listado. Descargable en Excel.
-
-Si hay un único resultado en la búsqueda, redirige directamente al perfil.
-
----
-
-### 9.3 Listados
-
-**Archivo:** `modulos/listados/listados.php`  
-**Acceso:** todos los niveles
-
-Página con tabla de listados disponibles. Nombre, descripción breve y botones Ver y Descargar por fila. Al hacer clic en Ver, el listado se muestra paginado debajo (50 registros por página). Descargar genera el Excel completo sin paginación.
-
-**Listados iniciales:**
-
-| Nombre | Fuente | Descripción |
+| Modulo | Archivo | Acceso |
 |---|---|---|
-| Padrón CD oficial | `padron_cd` | DNI, apellido, nombre, sigla. |
-| Padrón CP oficial | `padron_cp` | DNI, apellido, nombre, auxiliar. |
-| Padrón CD completo | `vista_padron_cd` | Con referentes, partido, trabajo, votos. |
-| Padrón CP completo | `vista_padron_cp` | Idem para CP. |
+| Login | modulos/login/login.php | Publico |
+| Buscador | modulos/buscador/buscador.php | Todos |
+| Listados | modulos/listados/listados.php | Todos |
+| Filtros | modulos/filtros/filtros.php | Todos |
+| ABM Referentes | modulos/abm_referentes/abm_referentes.php | admin, superadmin |
+| ABM Partidos | modulos/abm_partidos/abm_partidos.php | admin, superadmin |
+| ABM Trabajos | modulos/abm_trabajos/abm_trabajos.php | admin, superadmin |
+| ABM Personas | modulos/abm_personas/abm_personas.php | admin, superadmin |
+| ABM Usuarios | modulos/abm_usuarios/abm_usuarios.php | superadmin |
 
-Los listados se definen en un array de configuración dentro del módulo. Agregar uno nuevo no requiere modificar código fuera de ese array.
+### Buscador
 
----
+Home del sistema. Input de busqueda por apellido o DNI. Resultados en tabla con columnas DNI, apellido, nombre, carrera, padron y boton Ver mas por fila. Si hay un unico resultado redirige directamente al perfil. Todo descargable en Excel.
 
-### 9.4 Filtros
+### Listados
 
-**Archivo:** `modulos/filtros/filtros.php`  
-**Acceso:** todos los niveles
+Tabla de listados disponibles con botones Ver y Descargar por fila. Al ver, el listado aparece paginado debajo (50 registros por pagina). Descargar genera el Excel completo sin paginacion.
 
-Fila de combos en la parte superior. Cada combo no seleccionado equivale a "todos". Botón Generar listado. El resultado aparece debajo en formato tabular paginado con botón de descarga Excel.
+Listados iniciales:
 
-**Filtros disponibles:**
+| Nombre | Fuente |
+|---|---|
+| Padron CD oficial | padron_cd |
+| Padron CP oficial | padron_cp |
+| Padron CD completo | vista_padron_cd |
+| Padron CP completo | vista_padron_cp |
+
+### Filtros
+
+Fila de combos en la parte superior. Cada combo no seleccionado equivale a todos. Resultado en tabla paginada con descarga Excel.
 
 | Filtro | Fuente del combo |
 |---|---|
-| Padrón | CD / CP (fijo) |
-| Carrera | `carreras` |
-| Referente | `referentes` |
-| Partido | `partidos` |
-| Trabajo | `trabajos` |
-| Votó en elección | `elecciones` |
+| Padron | CD / CP (fijo) |
+| Carrera | carreras |
+| Referente | referentes |
+| Partido | partidos |
+| Trabajo | trabajos |
+| Voto en eleccion | elecciones |
 
-La query se construye dinámicamente según los filtros seleccionados, siempre contra la vista correspondiente.
+### ABM Referentes, Partidos, Trabajos
 
----
+Listado del catalogo con opciones editar y dar de baja logica. Formulario para agregar nuevo registro. Nunca se elimina un registro fisicamente.
 
-### 9.5 ABM Referentes
+### ABM Personas
 
-**Archivo:** `modulos/abm_referentes/abm_referentes.php`  
-**Acceso:** `admin` y `superadmin`
+Flujo de tres pasos: buscar persona por apellido o DNI, ver fila completa con datos actuales, editar vinculos (referentes, partido, trabajo) via combos de los catalogos correspondientes.
 
-Listado de referentes con opciones editar y dar de baja lógica (campo `activo`). Formulario para agregar nuevo referente con apellido y nombre separados. No se elimina ningún registro físicamente.
+### ABM Usuarios
 
----
-
-### 9.6 ABM Partidos
-
-**Archivo:** `modulos/abm_partidos/abm_partidos.php`  
-**Acceso:** `admin` y `superadmin`
-
-Misma lógica que ABM Referentes aplicada al catálogo de partidos.
+Solo superadmin. Listado con nombre, nivel y estado. Opciones de editar nivel, activar, desactivar. Formulario para crear nuevo usuario. Passwords con hash bcrypt. El superadmin no puede desactivarse a si mismo.
 
 ---
 
-### 9.7 ABM Trabajos
+## Exportacion a Excel
 
-**Archivo:** `modulos/abm_trabajos/abm_trabajos.php`  
-**Acceso:** `admin` y `superadmin`
+Archivo includes/excel.php, funcion exportar_excel($resultado, $nombre_archivo).
 
-Misma lógica que ABM Referentes aplicada al catálogo de trabajos.
-
----
-
-### 9.8 ABM Personas
-
-**Archivo:** `modulos/abm_personas/abm_personas.php`  
-**Acceso:** `admin` y `superadmin`
-
-**Flujo:**
-1. El admin busca una persona por apellido o DNI.
-2. Se muestra su fila completa en formato tabular con los datos actuales.
-3. Al lado de cada campo editable (referentes, partido, trabajo) hay un combo con los valores del catálogo correspondiente.
-4. El admin selecciona y confirma. El sistema actualiza `referentes_graduado`, `persona_partido` o `persona_trabajo`.
-
-Si el valor necesario no existe en el catálogo, el admin va primero al ABM correspondiente a crearlo y luego vuelve a esta pantalla.
+Recibe el resultado de una query como array de filas asociativas y genera un .xlsx para descarga. Las columnas se construyen dinamicamente desde las claves del primer registro. Sin columnas hardcodeadas. Todo listado es siempre descargable en Excel.
 
 ---
 
-### 9.9 ABM Usuarios
+## Convenciones de codigo
 
-**Archivo:** `modulos/abm_usuarios/abm_usuarios.php`  
-**Acceso:** solo `superadmin`
+Ver [docs/convenciones.md](../docs/convenciones.md) para el detalle completo.
 
-Listado de usuarios con nombre, nivel y estado (activo/inactivo). Opciones de editar nivel, activar, desactivar. Formulario para crear nuevo usuario con usuario, password y nivel. Las contraseñas se guardan con hash bcrypt. El superadmin no puede desactivarse a sí mismo.
+Resumen:
 
----
-
-## 10. Exportación a Excel
-
-**Archivo:** `includes/excel.php`  
-**Función:** `exportar_excel($resultado, $nombre_archivo)`
-
-Recibe el resultado de una query (array de filas asociativas) y genera un archivo `.xlsx` para descarga. Las columnas se construyen dinámicamente desde las claves del primer registro. Sin columnas hardcodeadas. Librería: PhpSpreadsheet via Composer.
-
-Todo listado es siempre descargable en Excel, incluyendo resultados de búsqueda de un solo graduado.
+- PHP en UTF-8 sin BOM. Indentacion con 4 espacios. Variables en snake_case. Sin closing tag al final de archivos PHP puros.
+- Siempre prepared statements con PDO. Nunca concatenacion de variables en queries.
+- Todo input del usuario se trata como potencialmente malicioso. htmlspecialchars() en todo output a pantalla.
+- Todo bloque de logica no trivial va comentado. Los archivos empiezan con un comentario que indica su rol.
 
 ---
 
-## 11. Convenciones de código
+## Pendientes
 
-- **PHP:** archivos en UTF-8 sin BOM. Indentación con 4 espacios. Variables en snake_case. Sin closing tag `?>` al final de archivos PHP puros.
-- **SQL:** siempre prepared statements con PDO. Nunca concatenación de variables en queries. Nombres de tablas y columnas en minúsculas con guión bajo.
-- **HTML:** generado desde PHP. Bootstrap 5 para estructura y componentes. Estilos propios solo en `assets/css/estilos.css`.
-- **Comentarios:** todo bloque de lógica no trivial va comentado. Los archivos empiezan con un comentario que indica su rol.
-- **Seguridad:** todo input del usuario se trata como potencialmente malicioso. Prepared statements en todas las queries. `htmlspecialchars()` en todo output a pantalla.
-
----
-
-## 12. Lo que este documento NO define todavía
-
-- Diseño visual detallado de cada pantalla más allá del home.
-- Cantidad de usuarios iniciales y sus credenciales.
-- Listados adicionales más allá de los cuatro iniciales.
-- Módulo de Fiscalización (etapa futura, sistema separado con login propio).
-
----
-
-## Resumen
-
-Consulta Padrón es una aplicación PHP sin frameworks, con routing simple por parámetro GET, login propio con tres niveles de acceso (consulta, admin, superadmin), y nueve módulos: buscador (home del sistema), listados, filtros, tres ABM de catálogos, ABM de personas y ABM de usuarios. Todo lo que se muestra en pantalla es un listado tabular descargable en Excel. Navbar y footer son archivos separados incluidos en todas las páginas. Toda consulta de datos va contra las vistas de la base. El desarrollo arranca en entorno local y se despliega en subdominio para aprobación antes de pasar a producción.
+- Cargar sede_laboral cuando el administrador tenga el listado tuneado.
+- Crear usuario superadmin en usuarios antes de arrancar el desarrollo.
+- Validacion profunda de consistencia de datos migrados antes del pase a produccion.
+- Modulo de Fiscalizacion (etapa futura, sistema separado con login propio).
