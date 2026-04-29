@@ -2,7 +2,7 @@
 
 ![Estado](https://img.shields.io/badge/estado-en_desarrollo-blue)
 ![Base de datos](https://img.shields.io/badge/base_de_datos-migrada-green)
-![Etapa](https://img.shields.io/badge/etapa-consulta_padron-blue)
+![Etapa](https://img.shields.io/badge/etapa-consulta_padron_v1-green)
 ![PHP](https://img.shields.io/badge/PHP-8.1-777BB4)
 ![MariaDB](https://img.shields.io/badge/MariaDB-10.6-4479A1)
 ![Bootstrap](https://img.shields.io/badge/Bootstrap-5-7952B3)
@@ -24,13 +24,13 @@ Este sistema gestiona los padrones de ambos procesos, permite cruzar y analizar 
 
 ## Etapas del proyecto
 
-**Consulta Padron** — en desarrollo
+**Consulta Padron v1** — completa
 
-Sistema web de consulta y analisis del padron de graduados. Permite filtrar por apellido, carrera, referente, espacio politico y lugar de trabajo. Muestra el perfil completo de cada graduado con todos sus vinculos. Permite exportar cualquier listado a Excel.
+Sistema web de consulta y analisis del padron de graduados. Buscador con sugerencias en tiempo real, padrones paginados con buscador interno, filtros combinables con perfil completo, ABM de catalogos y personas, exportacion a Excel en todos los modulos.
 
-**Upgrade** — pendiente
+**Consulta Padron v2** — pendiente
 
-Ampliacion del modelo de datos y las funcionalidades de consulta y reporte.
+Ampliacion de funcionalidades de consulta, reporte y cruce de datos.
 
 **Fiscalizacion** — pendiente
 
@@ -123,28 +123,19 @@ fiscalizar/
     │   └── excel.php
     ├── modulos/
     │   ├── login/
-    │   │   └── login.php
+    │   ├── logout/
     │   ├── buscador/
-    │   │   └── buscador.php
-    │   ├── listados/
-    │   │   └── listados.php
+    │   ├── padrones/
     │   ├── filtros/
-    │   │   └── filtros.php
     │   ├── abm_referentes/
-    │   │   └── abm_referentes.php
     │   ├── abm_partidos/
-    │   │   └── abm_partidos.php
     │   ├── abm_trabajos/
-    │   │   └── abm_trabajos.php
     │   ├── abm_personas/
-    │   │   └── abm_personas.php
     │   └── abm_usuarios/
-    │       └── abm_usuarios.php
     └── assets/
         ├── css/
-        │   └── estilos.css
-        └── js/
-            └── main.js
+        ├── js/
+        └── img/
 ```
 
 ---
@@ -157,8 +148,9 @@ fiscalizar/
 | Diseño de nueva base de datos | Completo |
 | Migracion de datos | Completo — pendiente validacion profunda antes de produccion |
 | Instalacion y configuracion local | Completo |
-| Consulta Padron — desarrollo | En curso |
-| Fiscalizacion — desarrollo | Pendiente |
+| Consulta Padron v1 | Completo |
+| Consulta Padron v2 | Pendiente |
+| Fiscalizacion | Pendiente |
 
 ---
 

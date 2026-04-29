@@ -74,11 +74,36 @@ Crear una base de datos llamada fiscaliz_padron con charset utf8mb4 y collation 
 
 Importar el archivo sql/estructura/fiscaliz_padron.sql desde la pestaña Importar.
 
+Si el archivo supera el limite de subida de phpMyAdmin, usar la linea de comandos:
+
+```
+mysql -u root fiscaliz_padron < sql/estructura/fiscaliz_padron.sql
+```
+
 ---
 
-## Paso 5 — Verificar la conexion
+## Paso 5 — Crear el usuario superadmin
 
-Crear un archivo temporal de prueba en consulta_padron/:
+Antes de acceder al sistema hay que crear al menos un usuario. Crear un archivo temporal generar_usuario.php en consulta_padron/ con este contenido:
+
+```php
+<?php
+require_once 'config/db.php';
+$hash = password_hash('tu_password_aqui', PASSWORD_BCRYPT);
+$stmt = $pdo->prepare("INSERT INTO usuarios (usuario, password, nivel, activo) VALUES ('superadmin', :hash, 'superadmin', 1)");
+$stmt->execute([':hash' => $hash]);
+echo 'Usuario creado.';
+```
+
+Acceder desde http://localhost/fiscalizar/consulta_padron/generar_usuario.php
+
+Borrar el archivo inmediatamente despues de usarlo.
+
+---
+
+## Paso 6 — Verificar la conexion
+
+Crear un archivo temporal test_conexion.php en consulta_padron/:
 
 ```php
 <?php
@@ -88,13 +113,11 @@ echo "Conexion exitosa. Base de datos: " . DB_NAME;
 
 Acceder desde http://localhost/fiscalizar/consulta_padron/test_conexion.php
 
-Si aparece el mensaje, la conexion funciona. Borrar el archivo de prueba antes de continuar.
+Borrar el archivo antes de continuar.
 
 ---
 
-## Paso 6 — Acceder a la aplicacion
-
-Una vez completados los pasos anteriores, la aplicacion esta disponible en:
+## Paso 7 — Acceder a la aplicacion
 
 ```
 http://localhost/fiscalizar/consulta_padron/
@@ -107,8 +130,6 @@ http://localhost/fiscalizar/consulta_padron/
 **vendor/ y composer.lock** no se versionan. Cada desarrollador ejecuta composer install en su entorno.
 
 **db.php** no se versiona. Cada desarrollador crea el suyo a partir de db.example.php.
-
-**El usuario superadmin** se crea directamente en la base antes de arrancar el desarrollo. Ver tabla usuarios en fiscaliz_padron.
 
 ---
 
@@ -125,3 +146,7 @@ Composer no esta instalado o no esta en el PATH. Descargar el instalador desde h
 **La pagina no carga**
 
 Verificar que la URL sea exactamente http://localhost/fiscalizar/consulta_padron/ y que Apache este corriendo en XAMPP.
+
+**El archivo SQL es muy grande para phpMyAdmin**
+
+Usar la importacion por linea de comandos descripta en el Paso 4.
