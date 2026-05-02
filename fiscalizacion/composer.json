@@ -1,0 +1,10 @@
+{
+    "name": "fiscalizar/fiscalizacion",
+    "description": "Modulo electoral de fiscalizacion en tiempo real - Facultad de Ciencias Sociales UBA",
+    "require": {
+        "phpoffice/phpspreadsheet": "^2.0"
+    },
+    "config": {
+        "vendor-dir": "vendor"
+    }
+}
