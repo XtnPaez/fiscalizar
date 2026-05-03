@@ -19,6 +19,8 @@ try {
             PDO::ATTR_EMULATE_PREPARES   => false,
         ]
     );
+    // Forzar collation uniforme para evitar conflicto entre vistas en UNIONs
+    $pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
 } catch (PDOException $e) {
     // En producción nunca mostrar el mensaje real
     die('Error de conexión a la base de datos.');    
