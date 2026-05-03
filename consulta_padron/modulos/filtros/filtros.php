@@ -2,10 +2,15 @@
 // modulos/filtros/filtros.php
 // Modulo de filtros del sistema Fiscalizar — Consulta Padron.
 // Acceso: todos los niveles autenticados.
-// Orden de combos: Padron, Referente, Partido, Trabajo, Auxiliar, Carrera, Eleccion, Voto.
-// Referente incluye opcion "Con Referentes" para filtrar no-SIN REFERENTE.
-// Resultado: perfil completo con todos los campos de las vistas CD y CP.
-// Scroll horizontal sincronizado arriba y abajo de la tabla.
+// Padron es obligatorio. Sin padron no hay resultado.
+// Auxiliar CP es obligatorio cuando hay padron elegido.
+// Logica de combinacion:
+//   CD  + Auxiliar CP = NO → solo vista_padron_cd
+//   CD  + Auxiliar CP = SI → vista_padron_cd + vista_padron_cp WHERE auxiliar = 1
+//   CP  + Auxiliar CP = NO → vista_padron_cp WHERE auxiliar = 0
+//   CP  + Auxiliar CP = SI → vista_padron_cp completa
+// Todas las columnas de votos siempre presentes en el resultado.
+// Carrera se inhibe en JS cuando padron = CP.
 
 verificar_sesion();
 
@@ -29,21 +34,31 @@ $stmt_elecciones = $pdo->query("SELECT id, nombre, tipo FROM elecciones ORDER BY
 $elecciones      = $stmt_elecciones->fetchAll();
 
 // --- Leer parametros ---
-$padron    = $_GET['padron']    ?? '';
-$referente = $_GET['referente'] ?? ''; // valor numerico o '_con_referentes'
-$partido   = $_GET['partido']   ?? '';
-$trabajo   = $_GET['trabajo']   ?? '';
-$auxiliar  = $_GET['auxiliar']  ?? '';
-$carrera   = $_GET['carrera']   ?? '';
-$eleccion  = $_GET['eleccion']  ?? '';
-$voto      = $_GET['voto']      ?? '';
-$accion    = $_GET['accion']    ?? '';
-$pagina    = max(1, intval($_GET['pagina'] ?? 1));
-$por_pagina = 50;
+$padron      = $_GET['padron']      ?? '';   // CD o CP — obligatorio
+$auxiliar_cp = $_GET['auxiliar_cp'] ?? '';   // SI o NO — obligatorio si hay padron
+$referente   = $_GET['referente']   ?? '';   // id numerico o '_con_referentes'
+$partido     = $_GET['partido']     ?? '';
+$trabajo     = $_GET['trabajo']     ?? '';
+$carrera     = $_GET['carrera']     ?? '';   // solo aplica a CD
+$eleccion    = $_GET['eleccion']    ?? '';
+$voto        = $_GET['voto']        ?? '';
+$accion      = $_GET['accion']      ?? '';
+$pagina      = max(1, intval($_GET['pagina'] ?? 1));
+$por_pagina  = 50;
 
-$filtro_aplicado = ($padron !== '' || $referente !== '' || $partido !== '' ||
-                    $trabajo !== '' || $auxiliar !== '' || $carrera  !== '' ||
-                    $eleccion !== '');
+// Hay filtro aplicado solo si padron y auxiliar_cp estan ambos elegidos
+$filtro_aplicado = ($padron !== '' && $auxiliar_cp !== '');
+
+// Aviso si se intento filtrar sin elegir padron o auxiliar
+$aviso = '';
+$intento_filtrar = isset($_GET['padron']) || isset($_GET['auxiliar_cp']);
+if ($intento_filtrar && !$filtro_aplicado) {
+    if ($padron === '') {
+        $aviso = 'Elegir un padrón para ver resultados.';
+    } elseif ($auxiliar_cp === '') {
+        $aviso = 'Elegir una opción de Auxiliares CP para ver resultados.';
+    }
+}
 
 $resultados      = [];
 $total_registros = 0;
@@ -55,12 +70,12 @@ if ($filtro_aplicado) {
     $conds_comunes = [];
     $params        = [];
 
-    // Referente: valor numerico = referente especifico, _con_referentes = tiene al menos uno
+    // Referente
     if ($referente === '_con_referentes') {
-    $conds_comunes[] = "dni IN (
-        SELECT rg.dni FROM referentes_graduado rg
-        JOIN referentes r ON rg.referente_1 = r.id
-        WHERE r.apellido != 'SIN REFERENTE'
+        $conds_comunes[] = "dni IN (
+            SELECT rg.dni FROM referentes_graduado rg
+            JOIN referentes r ON rg.referente_1 = r.id
+            WHERE r.apellido != 'SIN REFERENTE'
         )";
     } elseif ($referente !== '') {
         $conds_comunes[] = "dni IN (
@@ -82,7 +97,7 @@ if ($filtro_aplicado) {
         $params[':trabajo'] = $trabajo;
     }
 
-    // Determinar tipo de eleccion antes de construir los WHERE
+    // Tipo de eleccion para filtro de voto
     $tipo_eleccion = null;
     if ($eleccion !== '') {
         $stmt_tipo     = $pdo->prepare("SELECT tipo FROM elecciones WHERE id = :id");
@@ -90,7 +105,10 @@ if ($filtro_aplicado) {
         $tipo_eleccion = $stmt_tipo->fetchColumn();
     }
 
-    // --- SELECT desde vista_padron_cd ---
+    // -------------------------------------------------------
+    // SELECT desde vista_padron_cd
+    // Incluye columnas CP en NO fijo
+    // -------------------------------------------------------
     $conds_cd  = $conds_comunes;
     $params_cd = $params;
 
@@ -105,33 +123,31 @@ if ($filtro_aplicado) {
         $params_cd[':eleccion_cd'] = $eleccion;
     }
 
-    $where_cd  = count($conds_cd) > 0 ? 'WHERE ' . implode(' AND ', $conds_cd) : '';
+    $where_cd = count($conds_cd) > 0 ? 'WHERE ' . implode(' AND ', $conds_cd) : '';
 
     $select_cd = "
         SELECT
-            dni, apellido, nombre, carrera,
-            'SI'  AS padron_cd,
-            'NO'  AS padron_cp,
-            NULL  AS auxiliar,
+            dni, apellido, nombre,
+            carrera,
+            'CD'  AS padron,
+            0     AS auxiliar,
             referente_1, referente_2, referente_3,
             partido, trabajo, sede_laboral,
             voto_cd_2021, voto_cd_2024,
-            NULL AS voto_cp_2017,
-            NULL AS voto_cp_2019,
-            NULL AS voto_cp_2021,
-            NULL AS voto_cp_2024
+            'NO'  AS voto_cp_2017,
+            'NO'  AS voto_cp_2019,
+            'NO'  AS voto_cp_2021,
+            'NO'  AS voto_cp_2024
         FROM vista_padron_cd
         $where_cd
     ";
 
-    // --- SELECT desde vista_padron_cp ---
+    // -------------------------------------------------------
+    // SELECT desde vista_padron_cp
+    // Incluye columnas CD en NO fijo
+    // -------------------------------------------------------
     $conds_cp  = $conds_comunes;
     $params_cp = $params;
-
-    if ($auxiliar !== '') {
-        $conds_cp[]              = "auxiliar = :auxiliar";
-        $params_cp[':auxiliar']  = ($auxiliar === 'SI') ? 1 : 0;
-    }
 
     if ($tipo_eleccion === 'cp' && $voto !== '') {
         $op         = $voto === 'SI' ? 'IN' : 'NOT IN';
@@ -139,54 +155,77 @@ if ($filtro_aplicado) {
         $params_cp[':eleccion_cp'] = $eleccion;
     }
 
-    $where_cp  = count($conds_cp) > 0 ? 'WHERE ' . implode(' AND ', $conds_cp) : '';
+    $where_cp = count($conds_cp) > 0 ? 'WHERE ' . implode(' AND ', $conds_cp) : '';
+
+    // Auxiliar CP determina que subconjunto de CP se usa
+    $filtro_auxiliar_cd = '';
+    $filtro_auxiliar_cp = '';
+
+    if ($auxiliar_cp === 'SI') {
+        // Solo auxiliares CP
+        $filtro_auxiliar_cp = $where_cp !== ''
+            ? $where_cp . ' AND auxiliar = 1'
+            : 'WHERE auxiliar = 1';
+    } else {
+        // Solo graduados CP (sin auxiliares)
+        $filtro_auxiliar_cp = $where_cp !== ''
+            ? $where_cp . ' AND auxiliar = 0'
+            : 'WHERE auxiliar = 0';
+    }
 
     $select_cp = "
         SELECT
             dni, apellido, nombre,
             NULL  AS carrera,
-            'NO'  AS padron_cd,
-            'SI'  AS padron_cp,
+            'CP'  AS padron,
             auxiliar,
             referente_1, referente_2, referente_3,
             partido, trabajo, sede_laboral,
-            NULL AS voto_cd_2021,
-            NULL AS voto_cd_2024,
+            'NO'  AS voto_cd_2021,
+            'NO'  AS voto_cd_2024,
             voto_cp_2017, voto_cp_2019, voto_cp_2021, voto_cp_2024
         FROM vista_padron_cp
-        $where_cp
+        $filtro_auxiliar_cp
     ";
 
-    // --- Combinar segun padron seleccionado ---
-    if ($padron === 'CD') {
+    // -------------------------------------------------------
+    // Combinar segun padron y auxiliar_cp elegidos
+    // -------------------------------------------------------
+    if ($padron === 'CD' && $auxiliar_cp === 'NO') {
+        // Solo graduados CD
         $sql_union  = $select_cd;
         $params_all = $params_cd;
-    } elseif ($padron === 'CP') {
+
+    } elseif ($padron === 'CD' && $auxiliar_cp === 'SI') {
+        // Graduados CD + auxiliares CP
+        // UNION ALL porque no puede haber DNI repetido entre CD y auxiliares puros
+        $sql_union  = "($select_cd) UNION ALL ($select_cp)";
+        $params_all = array_merge($params_cd, $params_cp);
+
+    } elseif ($padron === 'CP' && $auxiliar_cp === 'NO') {
+        // Solo graduados CP (sin auxiliares)
         $sql_union  = $select_cp;
         $params_all = $params_cp;
+
     } else {
-        // Ambos padrones — consolidar en una fila por persona
-        $sql_union = "
+        // CP completo (graduados + auxiliares)
+        // Sacar el filtro de auxiliar para traer todos
+        $select_cp_todos = "
             SELECT
-                p.dni, p.apellido, p.nombre,
-                cd.carrera,
-                IF(cd.dni IS NOT NULL, 'SI', 'NO') AS padron_cd,
-                IF(cp.dni IS NOT NULL, 'SI', 'NO') AS padron_cp,
-                cp.auxiliar,
-                COALESCE(cd.referente_1,  cp.referente_1)  AS referente_1,
-                COALESCE(cd.referente_2,  cp.referente_2)  AS referente_2,
-                COALESCE(cd.referente_3,  cp.referente_3)  AS referente_3,
-                COALESCE(cd.partido,      cp.partido)      AS partido,
-                COALESCE(cd.trabajo,      cp.trabajo)      AS trabajo,
-                COALESCE(cd.sede_laboral, cp.sede_laboral) AS sede_laboral,
-                cd.voto_cd_2021, cd.voto_cd_2024,
-                cp.voto_cp_2017, cp.voto_cp_2019, cp.voto_cp_2021, cp.voto_cp_2024
-            FROM personas p
-            LEFT JOIN ($select_cd) cd ON p.dni = cd.dni
-            LEFT JOIN ($select_cp) cp ON p.dni = cp.dni
-            WHERE cd.dni IS NOT NULL OR cp.dni IS NOT NULL
+                dni, apellido, nombre,
+                NULL  AS carrera,
+                'CP'  AS padron,
+                auxiliar,
+                referente_1, referente_2, referente_3,
+                partido, trabajo, sede_laboral,
+                'NO'  AS voto_cd_2021,
+                'NO'  AS voto_cd_2024,
+                voto_cp_2017, voto_cp_2019, voto_cp_2021, voto_cp_2024
+            FROM vista_padron_cp
+            $where_cp
         ";
-        $params_all = array_merge($params_cd, $params_cp);
+        $sql_union  = $select_cp_todos;
+        $params_all = $params_cp;
     }
 
     $sql_ordenado = "SELECT * FROM ($sql_union) AS resultado ORDER BY apellido ASC, nombre ASC";
@@ -221,15 +260,15 @@ if ($filtro_aplicado) {
 
 // URL base para paginacion conservando filtros
 $params_url = http_build_query(array_filter([
-    'mod'      => 'filtros',
-    'padron'   => $padron,
-    'referente'=> $referente,
-    'partido'  => $partido,
-    'trabajo'  => $trabajo,
-    'auxiliar' => $auxiliar,
-    'carrera'  => $carrera,
-    'eleccion' => $eleccion,
-    'voto'     => $voto,
+    'mod'        => 'filtros',
+    'padron'     => $padron,
+    'auxiliar_cp'=> $auxiliar_cp,
+    'referente'  => $referente,
+    'partido'    => $partido,
+    'trabajo'    => $trabajo,
+    'carrera'    => $carrera,
+    'eleccion'   => $eleccion,
+    'voto'       => $voto,
 ]));
 
 require_once 'includes/navbar.php';
@@ -243,13 +282,24 @@ require_once 'includes/navbar.php';
 
     <div class="row g-2 mb-2">
 
-        <!-- Padron -->
+        <!-- Padron — obligatorio -->
         <div class="col-md-2">
-            <label class="form-label" style="font-size:0.8rem;">Padron</label>
-            <select name="padron" class="form-select form-select-sm">
-                <option value="">Todos</option>
+            <label class="form-label" style="font-size:0.8rem;">Padrón <span style="color:#e53e3e;">*</span></label>
+            <select name="padron" id="combo-padron" class="form-select form-select-sm">
+                <option value="" disabled <?php echo $padron === '' ? 'selected' : ''; ?>>Elegir</option>
                 <option value="CD" <?php echo $padron === 'CD' ? 'selected' : ''; ?>>CD</option>
                 <option value="CP" <?php echo $padron === 'CP' ? 'selected' : ''; ?>>CP</option>
+            </select>
+        </div>
+
+        <!-- Auxiliares CP — obligatorio si hay padron -->
+        <div class="col-md-2">
+            <label class="form-label" style="font-size:0.8rem;">Auxiliares CP <span style="color:#e53e3e;">*</span></label>
+            <select name="auxiliar_cp" id="combo-auxiliar" class="form-select form-select-sm"
+                <?php echo $padron === '' ? 'disabled' : ''; ?>>
+                <option value="" disabled <?php echo $auxiliar_cp === '' ? 'selected' : ''; ?>>Elegir</option>
+                <option value="SI" <?php echo $auxiliar_cp === 'SI' ? 'selected' : ''; ?>>SI</option>
+                <option value="NO" <?php echo $auxiliar_cp === 'NO' ? 'selected' : ''; ?>>NO</option>
             </select>
         </div>
 
@@ -271,7 +321,7 @@ require_once 'includes/navbar.php';
         </div>
 
         <!-- Partido -->
-        <div class="col-md-3">
+        <div class="col-md-4">
             <label class="form-label" style="font-size:0.8rem;">Partido</label>
             <select name="partido" class="form-select form-select-sm">
                 <option value="">Todos</option>
@@ -283,6 +333,10 @@ require_once 'includes/navbar.php';
                 <?php endforeach; ?>
             </select>
         </div>
+
+    </div>
+
+    <div class="row g-2 align-items-end">
 
         <!-- Trabajo -->
         <div class="col-md-3">
@@ -298,24 +352,11 @@ require_once 'includes/navbar.php';
             </select>
         </div>
 
-    </div>
-
-    <div class="row g-2 align-items-end">
-
-        <!-- Auxiliar -->
-        <div class="col-md-2">
-            <label class="form-label" style="font-size:0.8rem;">Auxiliar</label>
-            <select name="auxiliar" class="form-select form-select-sm">
-                <option value="">Todos</option>
-                <option value="SI" <?php echo $auxiliar === 'SI' ? 'selected' : ''; ?>>Si</option>
-                <option value="NO" <?php echo $auxiliar === 'NO' ? 'selected' : ''; ?>>No</option>
-            </select>
-        </div>
-
-        <!-- Carrera -->
+        <!-- Carrera — se inhibe si padron = CP -->
         <div class="col-md-2">
             <label class="form-label" style="font-size:0.8rem;">Carrera</label>
-            <select name="carrera" class="form-select form-select-sm">
+            <select name="carrera" id="combo-carrera" class="form-select form-select-sm"
+                <?php echo $padron === 'CP' ? 'disabled' : ''; ?>>
                 <option value="">Todas</option>
                 <?php foreach ($carreras as $c): ?>
                 <option value="<?php echo htmlspecialchars($c['sigla'], ENT_QUOTES, 'UTF-8'); ?>"
@@ -326,9 +367,9 @@ require_once 'includes/navbar.php';
             </select>
         </div>
 
-        <!-- Eleccion -->
+        <!-- Eleccion — todas siempre visibles -->
         <div class="col-md-4">
-            <label class="form-label" style="font-size:0.8rem;">Eleccion</label>
+            <label class="form-label" style="font-size:0.8rem;">Elección</label>
             <select name="eleccion" class="form-select form-select-sm">
                 <option value="">Todas</option>
                 <?php foreach ($elecciones as $e): ?>
@@ -341,12 +382,12 @@ require_once 'includes/navbar.php';
         </div>
 
         <!-- Voto -->
-        <div class="col-md-2">
+        <div class="col-md-1">
             <label class="form-label" style="font-size:0.8rem;">Voto</label>
             <select name="voto" class="form-select form-select-sm">
                 <option value="">Todos</option>
-                <option value="SI" <?php echo $voto === 'SI' ? 'selected' : ''; ?>>Voto</option>
-                <option value="NO" <?php echo $voto === 'NO' ? 'selected' : ''; ?>>No voto</option>
+                <option value="SI" <?php echo $voto === 'SI' ? 'selected' : ''; ?>>Votó</option>
+                <option value="NO" <?php echo $voto === 'NO' ? 'selected' : ''; ?>>No votó</option>
             </select>
         </div>
 
@@ -360,6 +401,12 @@ require_once 'includes/navbar.php';
 
     </div>
 </form>
+
+<?php if ($aviso !== ''): ?>
+    <div class="alert alert-warning" style="font-size:0.9rem;">
+        <?php echo htmlspecialchars($aviso, ENT_QUOTES, 'UTF-8'); ?>
+    </div>
+<?php endif; ?>
 
 <?php if ($filtro_aplicado): ?>
 
@@ -389,10 +436,9 @@ require_once 'includes/navbar.php';
                         <th>DNI</th>
                         <th>Apellido</th>
                         <th>Nombre</th>
+                        <th>Padrón</th>
                         <th>Carrera</th>
-                        <th>CD</th>
-                        <th>CP</th>
-                        <th>Auxiliar</th>
+                        <th>Aux CP</th>
                         <th>Referente 1</th>
                         <th>Referente 2</th>
                         <th>Referente 3</th>
@@ -413,14 +459,15 @@ require_once 'includes/navbar.php';
                         <td><?php echo htmlspecialchars($f['dni'],      ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars($f['apellido'], ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars($f['nombre'],   ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars($f['carrera']      ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo $f['padron_cd'] === 'SI'
-                            ? '<span class="badge" style="background-color:#a6d900;color:#1a1a2e;">SI</span>'
-                            : '<span class="text-secondary">—</span>'; ?></td>
-                        <td><?php echo $f['padron_cp'] === 'SI'
-                            ? '<span class="badge" style="background-color:#1a1a2e;color:#fff;">SI</span>'
-                            : '<span class="text-secondary">—</span>'; ?></td>
-                        <td><?php echo $f['auxiliar'] === null ? '—' : ($f['auxiliar'] ? 'SI' : 'NO'); ?></td>
+                        <td>
+                            <?php if ($f['padron'] === 'CD'): ?>
+                                <span class="badge" style="background-color:#a6d900;color:#1a1a2e;">CD</span>
+                            <?php else: ?>
+                                <span class="badge" style="background-color:#1a1a2e;color:#fff;">CP</span>
+                            <?php endif; ?>
+                        </td>
+                        <td><?php echo htmlspecialchars($f['carrera'] ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo $f['auxiliar'] ? 'SI' : 'NO'; ?></td>
                         <td><?php echo htmlspecialchars($f['referente_1'] ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars($f['referente_2'] ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars($f['referente_3'] ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
@@ -469,7 +516,7 @@ require_once 'includes/navbar.php';
                 </li>
             </ul>
             <p class="text-center text-secondary" style="font-size:0.8rem;">
-                Pagina <?php echo $pagina; ?> de <?php echo $total_paginas; ?>
+                Página <?php echo $pagina; ?> de <?php echo $total_paginas; ?>
             </p>
         </nav>
         <?php endif; ?>
@@ -478,29 +525,60 @@ require_once 'includes/navbar.php';
 
 <?php endif; ?>
 
-<!-- Script scroll superior sincronizado -->
+<!-- JavaScript: habilitar/inhabilitar combos segun padron elegido -->
 <script>
 (function () {
+
+    const comboPadron   = document.getElementById('combo-padron');
+    const comboAuxiliar = document.getElementById('combo-auxiliar');
+    const comboCarrera  = document.getElementById('combo-carrera');
+
+    // Scroll superior sincronizado
     const scrollTop   = document.getElementById('scroll-top');
     const scrollTabla = document.getElementById('scroll-tabla');
     const inner       = document.getElementById('scroll-top-inner');
 
-    if (!scrollTop || !scrollTabla || !inner) return;
-
-    function ajustarAncho() {
-        const tabla = document.getElementById('tabla-filtros');
-        if (tabla) inner.style.width = tabla.offsetWidth + 'px';
+    if (scrollTop && scrollTabla && inner) {
+        function ajustarAncho() {
+            const tabla = document.getElementById('tabla-filtros');
+            if (tabla) inner.style.width = tabla.offsetWidth + 'px';
+        }
+        ajustarAncho();
+        window.addEventListener('resize', ajustarAncho);
+        scrollTop.addEventListener('scroll', function () {
+            scrollTabla.scrollLeft = scrollTop.scrollLeft;
+        });
+        scrollTabla.addEventListener('scroll', function () {
+            scrollTop.scrollLeft = scrollTabla.scrollLeft;
+        });
     }
 
-    ajustarAncho();
-    window.addEventListener('resize', ajustarAncho);
+    // Logica de habilitacion de combos
+    function actualizarCombos() {
+        const padron = comboPadron.value;
 
-    scrollTop.addEventListener('scroll', function () {
-        scrollTabla.scrollLeft = scrollTop.scrollLeft;
-    });
-    scrollTabla.addEventListener('scroll', function () {
-        scrollTop.scrollLeft = scrollTabla.scrollLeft;
-    });
+        if (padron === '') {
+            // Sin padron: inhibe auxiliar y carrera
+            comboAuxiliar.disabled = true;
+            comboCarrera.disabled  = true;
+        } else if (padron === 'CP') {
+            // Padron CP: habilita auxiliar, inhibe carrera
+            comboAuxiliar.disabled = false;
+            comboCarrera.disabled  = true;
+            comboCarrera.value     = '';
+        } else {
+            // Padron CD: habilita auxiliar y carrera
+            comboAuxiliar.disabled = false;
+            comboCarrera.disabled  = false;
+        }
+    }
+
+    // Ejecutar al cargar la pagina para reflejar estado actual
+    actualizarCombos();
+
+    // Ejecutar al cambiar el padron
+    comboPadron.addEventListener('change', actualizarCombos);
+
 })();
 </script>
 
