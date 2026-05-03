@@ -1,0 +1,33 @@
+# ============================================================
+# .gitignore — repositorio fiscalizar
+# Aplica a todos los desarrollos del repositorio
+# ============================================================
+
+# Credenciales de base de datos
+# Cada desarrollador crea el suyo a partir de db.example.php
+consulta_padron/config/db.php
+fiscalizacion/config/db.php
+
+# Dependencias de Composer
+# Cada desarrollador ejecuta composer install en su entorno
+consulta_padron/vendor/
+fiscalizacion/vendor/
+
+# Archivos temporales de sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs de PHP
+*.log
+
+# Archivos de IDE y editores
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+
+# Archivos temporales de PHP
+*.tmp
