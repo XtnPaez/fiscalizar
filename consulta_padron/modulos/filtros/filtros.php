@@ -11,8 +11,9 @@
 //   CP  + Auxiliar CP = SI → vista_padron_cp completa
 // Todas las columnas de votos siempre presentes en el resultado.
 // Carrera se inhibe en JS cuando padron = CP.
-// Parametros posicionales (?) en lugar de nombrados para evitar HY093
-// al hacer array_merge de params_cd y params_cp en el caso UNION ALL.
+// COLLATE utf8mb4_unicode_ci en columnas de texto para evitar conflicto en UNION.
+// Parametros posicionales (?) para evitar HY093 en array_merge.
+// sede_laboral reemplazada por sede y municipio (mayo 2026).
 
 verificar_sesion();
 
@@ -32,6 +33,9 @@ $partidos        = $stmt_partidos->fetchAll();
 $stmt_trabajos   = $pdo->query("SELECT id, nombre FROM trabajos WHERE activo = 1 ORDER BY nombre ASC");
 $trabajos        = $stmt_trabajos->fetchAll();
 
+$stmt_sedes      = $pdo->query("SELECT id, nombre FROM sedes WHERE activo = 1 ORDER BY nombre ASC");
+$sedes           = $stmt_sedes->fetchAll();
+
 $stmt_elecciones = $pdo->query("SELECT id, nombre, tipo FROM elecciones ORDER BY anio ASC, tipo ASC");
 $elecciones      = $stmt_elecciones->fetchAll();
 
@@ -41,6 +45,7 @@ $auxiliar_cp = $_GET['auxiliar_cp'] ?? '';
 $referente   = $_GET['referente']   ?? '';
 $partido     = $_GET['partido']     ?? '';
 $trabajo     = $_GET['trabajo']     ?? '';
+$sede        = $_GET['sede']        ?? '';
 $carrera     = $_GET['carrera']     ?? '';
 $eleccion    = $_GET['eleccion']    ?? '';
 $voto        = $_GET['voto']        ?? '';
@@ -66,9 +71,7 @@ $total_paginas   = 0;
 
 if ($filtro_aplicado) {
 
-    // -----------------------------------------------------------
     // Tipo de eleccion para filtro de voto
-    // -----------------------------------------------------------
     $tipo_eleccion = null;
     if ($eleccion !== '') {
         $stmt_tipo = $pdo->prepare("SELECT tipo FROM elecciones WHERE id = ?");
@@ -82,7 +85,7 @@ if ($filtro_aplicado) {
     // Usa parametros posicionales (?) para permitir array_merge
     // sin conflicto de claves duplicadas (HY093).
     // -----------------------------------------------------------
-    function construir_where($referente, $partido, $trabajo, $carrera, $tipo_eleccion, $eleccion, $voto, $vista) {
+    function construir_where($referente, $partido, $trabajo, $sede, $carrera, $tipo_eleccion, $eleccion, $voto, $vista) {
         $conds  = [];
         $params = [];
 
@@ -115,6 +118,12 @@ if ($filtro_aplicado) {
             $params[] = $trabajo;
         }
 
+        // Sede
+        if ($sede !== '') {
+            $conds[]  = "dni IN (SELECT dni FROM persona_sede WHERE id_sede = ?)";
+            $params[] = $sede;
+        }
+
         // Carrera — solo para vista CD
         if ($vista === 'cd' && $carrera !== '') {
             $conds[]  = "carrera = ?";
@@ -135,11 +144,9 @@ if ($filtro_aplicado) {
         return [$where, $params];
     }
 
-    // -----------------------------------------------------------
     // SELECT desde vista_padron_cd
-    // -----------------------------------------------------------
     [$where_cd, $params_cd] = construir_where(
-        $referente, $partido, $trabajo, $carrera,
+        $referente, $partido, $trabajo, $sede, $carrera,
         $tipo_eleccion, $eleccion, $voto, 'cd'
     );
 
@@ -156,7 +163,8 @@ if ($filtro_aplicado) {
             referente_3  COLLATE utf8mb4_unicode_ci AS referente_3,
             partido      COLLATE utf8mb4_unicode_ci AS partido,
             trabajo      COLLATE utf8mb4_unicode_ci AS trabajo,
-            sede_laboral COLLATE utf8mb4_unicode_ci AS sede_laboral,
+            sede         COLLATE utf8mb4_unicode_ci AS sede,
+            municipio    COLLATE utf8mb4_unicode_ci AS municipio,
             voto_cd_2021, voto_cd_2024,
             'NO' AS voto_cp_2017,
             'NO' AS voto_cp_2019,
@@ -166,28 +174,21 @@ if ($filtro_aplicado) {
         $where_cd
     ";
 
-    // -----------------------------------------------------------
     // SELECT desde vista_padron_cp
-    // Filtro de auxiliar se agrega segun auxiliar_cp elegido
-    // -----------------------------------------------------------
     [$where_cp_base, $params_cp] = construir_where(
-        $referente, $partido, $trabajo, '',
+        $referente, $partido, $trabajo, $sede, '',
         $tipo_eleccion, $eleccion, $voto, 'cp'
     );
 
-    // Agregar filtro de auxiliar al WHERE de CP
     if ($auxiliar_cp === 'SI' && $padron === 'CD') {
-        // En caso CD+SI solo traemos auxiliares CP
         $where_cp = $where_cp_base !== ''
             ? $where_cp_base . ' AND auxiliar = 1'
             : 'WHERE auxiliar = 1';
     } elseif ($auxiliar_cp === 'NO' && $padron === 'CP') {
-        // Solo graduados CP sin auxiliares
         $where_cp = $where_cp_base !== ''
             ? $where_cp_base . ' AND auxiliar = 0'
             : 'WHERE auxiliar = 0';
     } else {
-        // CP completo o auxiliares CP solos sin filtro adicional
         $where_cp = $where_cp_base;
     }
 
@@ -204,7 +205,8 @@ if ($filtro_aplicado) {
             referente_3  COLLATE utf8mb4_unicode_ci AS referente_3,
             partido      COLLATE utf8mb4_unicode_ci AS partido,
             trabajo      COLLATE utf8mb4_unicode_ci AS trabajo,
-            sede_laboral COLLATE utf8mb4_unicode_ci AS sede_laboral,
+            sede         COLLATE utf8mb4_unicode_ci AS sede,
+            municipio    COLLATE utf8mb4_unicode_ci AS municipio,
             'NO' AS voto_cd_2021,
             'NO' AS voto_cd_2024,
             voto_cp_2017, voto_cp_2019, voto_cp_2021, voto_cp_2024
@@ -212,11 +214,7 @@ if ($filtro_aplicado) {
         $where_cp
     ";
 
-    // -----------------------------------------------------------
-    // Combinar segun padron y auxiliar_cp elegidos
-    // array_merge funciona sin conflicto porque los params
-    // son arrays indexados (posicionales), no asociativos
-    // -----------------------------------------------------------
+    // Combinar segun padron y auxiliar_cp
     if ($padron === 'CD' && $auxiliar_cp === 'NO') {
         $sql_union  = $select_cd;
         $params_all = $params_cd;
@@ -230,8 +228,28 @@ if ($filtro_aplicado) {
         $params_all = $params_cp;
 
     } else {
-        // CP completo
-        $sql_union  = $select_cp;
+        $select_cp_todos = "
+            SELECT
+                dni,
+                apellido     COLLATE utf8mb4_unicode_ci AS apellido,
+                nombre       COLLATE utf8mb4_unicode_ci AS nombre,
+                NULL         AS carrera,
+                'CP'         AS padron,
+                auxiliar,
+                referente_1  COLLATE utf8mb4_unicode_ci AS referente_1,
+                referente_2  COLLATE utf8mb4_unicode_ci AS referente_2,
+                referente_3  COLLATE utf8mb4_unicode_ci AS referente_3,
+                partido      COLLATE utf8mb4_unicode_ci AS partido,
+                trabajo      COLLATE utf8mb4_unicode_ci AS trabajo,
+                sede         COLLATE utf8mb4_unicode_ci AS sede,
+                municipio    COLLATE utf8mb4_unicode_ci AS municipio,
+                'NO' AS voto_cd_2021,
+                'NO' AS voto_cd_2024,
+                voto_cp_2017, voto_cp_2019, voto_cp_2021, voto_cp_2024
+            FROM vista_padron_cp
+            $where_cp_base
+        ";
+        $sql_union  = $select_cp_todos;
         $params_all = $params_cp;
     }
 
@@ -253,7 +271,7 @@ if ($filtro_aplicado) {
     $pagina          = min($pagina, max(1, $total_paginas));
     $offset          = ($pagina - 1) * $por_pagina;
 
-    // Traer pagina actual — LIMIT y OFFSET se agregan al final como posicionales
+    // Traer pagina actual
     $sql_paginado = $sql_ordenado . " LIMIT ? OFFSET ?";
     $params_pag   = array_merge($params_all, [$por_pagina, $offset]);
     $stmt = $pdo->prepare($sql_paginado);
@@ -269,6 +287,7 @@ $params_url = http_build_query(array_filter([
     'referente'   => $referente,
     'partido'     => $partido,
     'trabajo'     => $trabajo,
+    'sede'        => $sede,
     'carrera'     => $carrera,
     'eleccion'    => $eleccion,
     'voto'        => $voto,
@@ -279,7 +298,6 @@ require_once 'includes/navbar.php';
 
 <div class="modulo-titulo">Filtros</div>
 
-<!-- Formulario de filtros -->
 <form method="GET" action="index.php" class="mb-4">
     <input type="hidden" name="mod" value="filtros">
 
@@ -295,7 +313,7 @@ require_once 'includes/navbar.php';
             </select>
         </div>
 
-        <!-- Auxiliares CP — obligatorio si hay padron -->
+        <!-- Auxiliares CP — obligatorio -->
         <div class="col-md-2">
             <label class="form-label" style="font-size:0.8rem;">Auxiliares CP <span style="color:#e53e3e;">*</span></label>
             <select name="auxiliar_cp" id="combo-auxiliar" class="form-select form-select-sm"
@@ -342,7 +360,7 @@ require_once 'includes/navbar.php';
     <div class="row g-2 align-items-end">
 
         <!-- Trabajo -->
-        <div class="col-md-3">
+        <div class="col-md-2">
             <label class="form-label" style="font-size:0.8rem;">Trabajo</label>
             <select name="trabajo" class="form-select form-select-sm">
                 <option value="">Todos</option>
@@ -350,6 +368,20 @@ require_once 'includes/navbar.php';
                 <option value="<?php echo $t['id']; ?>"
                     <?php echo $trabajo == $t['id'] ? 'selected' : ''; ?>>
                     <?php echo htmlspecialchars($t['nombre'], ENT_QUOTES, 'UTF-8'); ?>
+                </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+
+        <!-- Sede -->
+        <div class="col-md-2">
+            <label class="form-label" style="font-size:0.8rem;">Sede</label>
+            <select name="sede" class="form-select form-select-sm">
+                <option value="">Todas</option>
+                <?php foreach ($sedes as $s): ?>
+                <option value="<?php echo $s['id']; ?>"
+                    <?php echo $sede == $s['id'] ? 'selected' : ''; ?>>
+                    <?php echo htmlspecialchars($s['nombre'], ENT_QUOTES, 'UTF-8'); ?>
                 </option>
                 <?php endforeach; ?>
             </select>
@@ -370,8 +402,8 @@ require_once 'includes/navbar.php';
             </select>
         </div>
 
-        <!-- Eleccion — todas siempre visibles -->
-        <div class="col-md-4">
+        <!-- Eleccion -->
+        <div class="col-md-3">
             <label class="form-label" style="font-size:0.8rem;">Elección</label>
             <select name="eleccion" class="form-select form-select-sm">
                 <option value="">Todas</option>
@@ -448,6 +480,7 @@ require_once 'includes/navbar.php';
                         <th>Partido</th>
                         <th>Trabajo</th>
                         <th>Sede</th>
+                        <th>Municipio</th>
                         <th>CD 2021</th>
                         <th>CD 2024</th>
                         <th>CP 2017</th>
@@ -469,14 +502,15 @@ require_once 'includes/navbar.php';
                                 <span class="badge" style="background-color:#1a1a2e;color:#fff;">CP</span>
                             <?php endif; ?>
                         </td>
-                        <td><?php echo htmlspecialchars($f['carrera'] ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars($f['carrera']   ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo $f['auxiliar'] ? 'SI' : 'NO'; ?></td>
                         <td><?php echo htmlspecialchars($f['referente_1'] ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars($f['referente_2'] ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars($f['referente_3'] ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars($f['partido']      ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars($f['trabajo']      ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars($f['sede_laboral'] ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars($f['partido']    ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars($f['trabajo']    ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars($f['sede']       ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars($f['municipio']  ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
                         <?php
                         $votos = ['voto_cd_2021','voto_cd_2024','voto_cp_2017','voto_cp_2019','voto_cp_2021','voto_cp_2024'];
                         foreach ($votos as $v):
@@ -528,7 +562,6 @@ require_once 'includes/navbar.php';
 
 <?php endif; ?>
 
-<!-- JavaScript: habilitar/inhabilitar combos segun padron elegido -->
 <script>
 (function () {
 
@@ -536,7 +569,6 @@ require_once 'includes/navbar.php';
     const comboAuxiliar = document.getElementById('combo-auxiliar');
     const comboCarrera  = document.getElementById('combo-carrera');
 
-    // Scroll superior sincronizado
     const scrollTop   = document.getElementById('scroll-top');
     const scrollTabla = document.getElementById('scroll-tabla');
     const inner       = document.getElementById('scroll-top-inner');
@@ -556,10 +588,8 @@ require_once 'includes/navbar.php';
         });
     }
 
-    // Logica de habilitacion de combos
     function actualizarCombos() {
         const padron = comboPadron.value;
-
         if (padron === '') {
             comboAuxiliar.disabled = true;
             comboCarrera.disabled  = true;
