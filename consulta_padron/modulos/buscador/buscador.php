@@ -128,19 +128,19 @@ if ($dni_perfil > 0) {
 
     if ($perfil) {
 
-        // Referentes, partido, trabajo y sede — desde vista_padron_cd si esta en CD
+        // Referentes, partido, trabajo, sede y municipio — desde vista_padron_cd si esta en CD
         // Si solo esta en CP, desde vista_padron_cp
         // Estos datos son atributos de la persona, identicos en ambas vistas
         if ($perfil['padron_cd'] === 'SI') {
             $stmt = $pdo->prepare("
                 SELECT referente_1, referente_2, referente_3,
-                       partido, trabajo, sede_laboral
+                       partido, trabajo, sede, municipio
                 FROM vista_padron_cd WHERE dni = :dni
             ");
         } else {
             $stmt = $pdo->prepare("
                 SELECT referente_1, referente_2, referente_3,
-                       partido, trabajo, sede_laboral
+                       partido, trabajo, sede, municipio
                 FROM vista_padron_cp WHERE dni = :dni
             ");
         }
@@ -172,18 +172,19 @@ if ($dni_perfil > 0) {
     if (isset($_GET['exportar']) && $_GET['exportar'] === '1' && $perfil) {
         $v = $perfil['vinculos'] ?? [];
         $fila = [
-            'dni'          => $perfil['dni'],
-            'apellido'     => $perfil['apellido'],
-            'nombre'       => $perfil['nombre'],
-            'carrera'      => $perfil['carrera']             ?? '—',
-            'padron_cd'    => $perfil['padron_cd'],
-            'padron_cp'    => $perfil['padron_cp'],
-            'referente_1'  => $v['referente_1']              ?? '—',
-            'referente_2'  => $v['referente_2']              ?? '—',
-            'referente_3'  => $v['referente_3']              ?? '—',
-            'partido'      => $v['partido']                  ?? '—',
-            'trabajo'      => $v['trabajo']                  ?? '—',
-            'sede_laboral' => $v['sede_laboral']             ?? '—',
+            'dni'         => $perfil['dni'],
+            'apellido'    => $perfil['apellido'],
+            'nombre'      => $perfil['nombre'],
+            'carrera'     => $perfil['carrera']    ?? '—',
+            'padron_cd'   => $perfil['padron_cd'],
+            'padron_cp'   => $perfil['padron_cp'],
+            'referente_1' => $v['referente_1']     ?? '—',
+            'referente_2' => $v['referente_2']     ?? '—',
+            'referente_3' => $v['referente_3']     ?? '—',
+            'partido'     => $v['partido']          ?? '—',
+            'trabajo'     => $v['trabajo']          ?? '—',
+            'sede'        => $v['sede']             ?? '—',
+            'municipio'   => $v['municipio']        ?? '—',
         ];
         if (!empty($perfil['votos_cd'])) {
             $fila['voto_cd_2021'] = $perfil['votos_cd']['voto_cd_2021'];
@@ -329,12 +330,13 @@ require_once 'includes/navbar.php';
                 <?php
                 $v = $perfil['vinculos'] ?? [];
                 $filas = [
-                    'Referente 1'  => $v['referente_1']  ?? '—',
-                    'Referente 2'  => $v['referente_2']  ?? '—',
-                    'Referente 3'  => $v['referente_3']  ?? '—',
-                    'Partido'      => $v['partido']       ?? '—',
-                    'Trabajo'      => $v['trabajo']       ?? '—',
-                    'Sede laboral' => $v['sede_laboral']  ?? '—',
+                    'Referente 1' => $v['referente_1'] ?? '—',
+                    'Referente 2' => $v['referente_2'] ?? '—',
+                    'Referente 3' => $v['referente_3'] ?? '—',
+                    'Partido'     => $v['partido']      ?? '—',
+                    'Trabajo'     => $v['trabajo']      ?? '—',
+                    'Sede'        => $v['sede']         ?? '—',
+                    'Municipio'   => $v['municipio']    ?? '—',
                 ];
                 foreach ($filas as $label => $valor):
                 ?>
