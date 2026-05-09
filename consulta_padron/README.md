@@ -87,6 +87,8 @@ consulta_padron/
 ├── modulos/
 │   ├── login/
 │   │   └── login.php
+│   ├── error/
+│   │   └── error.php
 │   ├── buscador/
 │   │   └── buscador.php
 │   ├── listados/
@@ -156,6 +158,7 @@ auth.php expone tres funciones:
 | Modulo | Archivo | Acceso |
 |---|---|---|
 | Login | modulos/login/login.php | Publico |
+| Error | modulos/error/error.php | Todos |
 | Buscador | modulos/buscador/buscador.php | Todos |
 | Listados | modulos/listados/listados.php | Todos |
 | Filtros | modulos/filtros/filtros.php | Todos |

@@ -22,6 +22,7 @@ $modulos = [
     'abm_trabajos'   => 'modulos/abm_trabajos/abm_trabajos.php',
     'abm_personas'   => 'modulos/abm_personas/abm_personas.php',
     'abm_usuarios'   => 'modulos/abm_usuarios/abm_usuarios.php',
+    'error'          => 'modulos/error/error.php',
 ];
 
 // Leer el parametro mod de la URL
@@ -38,5 +39,13 @@ if ($mod !== 'login') {
     verificar_sesion();
 }
 
-// Cargar el modulo correspondiente
-require_once $modulos[$mod];
+// Cargar el modulo dentro de un try/catch global.
+// Cualquier excepcion no manejada dentro del modulo
+// redirige a la pagina de error sin romper la sesion.
+try {
+    require_once $modulos[$mod];
+} catch (Exception $e) {
+    $mensaje_error = 'El sistema encontró un problema. Intentá de nuevo.';
+    require_once $modulos['error'];
+    exit;
+}

@@ -588,18 +588,27 @@ require_once 'includes/navbar.php';
         });
     }
 
+    // Actualiza estado de combos segun padron seleccionado.
+    // CD: auxiliar deshabilitado y reseteado (los auxiliares no son de CD),
+    //     carrera habilitada.
+    // CP: auxiliar habilitado, carrera deshabilitada y reseteada.
+    // Sin padron: todo deshabilitado.
     function actualizarCombos() {
         const padron = comboPadron.value;
         if (padron === '') {
             comboAuxiliar.disabled = true;
-            comboCarrera.disabled  = true;
-        } else if (padron === 'CP') {
-            comboAuxiliar.disabled = false;
+            comboAuxiliar.value    = '';
             comboCarrera.disabled  = true;
             comboCarrera.value     = '';
-        } else {
-            comboAuxiliar.disabled = false;
+        } else if (padron === 'CD') {
+            comboAuxiliar.disabled = true;
+            comboAuxiliar.value    = 'NO'; // CD nunca tiene auxiliares CP
             comboCarrera.disabled  = false;
+        } else if (padron === 'CP') {
+            comboAuxiliar.disabled = false;
+            comboAuxiliar.value    = '';
+            comboCarrera.disabled  = true;
+            comboCarrera.value     = '';
         }
     }
 

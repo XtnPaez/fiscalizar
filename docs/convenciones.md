@@ -75,6 +75,15 @@ echo htmlspecialchars($fila['apellido'], ENT_QUOTES, 'UTF-8');
 
 ---
 
+## Manejo de errores
+
+- Todo modulo se carga desde index.php dentro de un try/catch global.
+- Cualquier excepcion no manejada redirige a modulos/error/error.php sin romper la sesion.
+- El modulo error muestra un mensaje amigable y un boton para volver al inicio.
+- Para errores esperados dentro de un modulo, usar $mensaje_error antes de hacer require del modulo error.
+
+---
+
 ## HTML y frontend
 
 - HTML generado desde PHP.
