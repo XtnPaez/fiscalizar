@@ -3,7 +3,8 @@
 // Modulo de filtros del sistema Fiscalizar — Consulta Padron.
 // Acceso: todos los niveles autenticados.
 // Padron es obligatorio. Sin padron no hay resultado.
-// Auxiliar CP es obligatorio cuando hay padron elegido.
+// Auxiliar CP se fuerza a NO cuando padron = CD via hidden input,
+// porque los campos disabled no se envian en el form (fix mayo 2026).
 // Logica de combinacion:
 //   CD  + Auxiliar CP = NO → solo vista_padron_cd
 //   CD  + Auxiliar CP = SI → vista_padron_cd + vista_padron_cp WHERE auxiliar = 1
@@ -53,6 +54,9 @@ $accion      = $_GET['accion']      ?? '';
 $pagina      = max(1, intval($_GET['pagina'] ?? 1));
 $por_pagina  = 50;
 
+// Cuando padron = CD, auxiliar_cp llega como NO desde el hidden input.
+// Cuando padron = CP, auxiliar_cp llega desde el combo visible.
+// El filtro se considera aplicado cuando ambos valores estan presentes.
 $filtro_aplicado = ($padron !== '' && $auxiliar_cp !== '');
 
 $aviso = '';
@@ -228,6 +232,7 @@ if ($filtro_aplicado) {
         $params_all = $params_cp;
 
     } else {
+        // CP + auxiliar_cp = SI: padron CP completo sin filtro de auxiliar
         $select_cp_todos = "
             SELECT
                 dni,
@@ -301,6 +306,15 @@ require_once 'includes/navbar.php';
 <form method="GET" action="index.php" class="mb-4">
     <input type="hidden" name="mod" value="filtros">
 
+    <!--
+        Hidden input para auxiliar_cp cuando padron = CD.
+        Los campos select disabled no se envian en el form.
+        Cuando padron = CD, el JS pone este hidden en NO y deshabilita el combo visible.
+        Cuando padron = CP, el JS vacia este hidden y habilita el combo visible.
+        Asi el PHP siempre recibe auxiliar_cp sin importar el padron elegido.
+    -->
+    <input type="hidden" name="auxiliar_cp" id="hidden-auxiliar" value="">
+
     <div class="row g-2 mb-2">
 
         <!-- Padron — obligatorio -->
@@ -313,11 +327,11 @@ require_once 'includes/navbar.php';
             </select>
         </div>
 
-        <!-- Auxiliares CP — obligatorio -->
+        <!-- Auxiliares CP — obligatorio cuando padron = CP, automatico cuando padron = CD -->
         <div class="col-md-2">
             <label class="form-label" style="font-size:0.8rem;">Auxiliares CP <span style="color:#e53e3e;">*</span></label>
             <select name="auxiliar_cp" id="combo-auxiliar" class="form-select form-select-sm"
-                <?php echo $padron === '' ? 'disabled' : ''; ?>>
+                <?php echo ($padron === '' || $padron === 'CD') ? 'disabled' : ''; ?>>
                 <option value="" disabled <?php echo $auxiliar_cp === '' ? 'selected' : ''; ?>>Elegir</option>
                 <option value="SI" <?php echo $auxiliar_cp === 'SI' ? 'selected' : ''; ?>>SI</option>
                 <option value="NO" <?php echo $auxiliar_cp === 'NO' ? 'selected' : ''; ?>>NO</option>
@@ -458,7 +472,7 @@ require_once 'includes/navbar.php';
                 class="btn btn-outline-secondary btn-sm">Descargar Excel</a>
         </div>
 
-        <!-- Scroll superior sincronizado -->
+        <!-- Scroll superior sincronizado con la tabla -->
         <div id="scroll-top" style="overflow-x:auto; overflow-y:hidden; height:18px; margin-bottom:2px;">
             <div id="scroll-top-inner" style="height:1px;"></div>
         </div>
@@ -502,15 +516,15 @@ require_once 'includes/navbar.php';
                                 <span class="badge" style="background-color:#1a1a2e;color:#fff;">CP</span>
                             <?php endif; ?>
                         </td>
-                        <td><?php echo htmlspecialchars($f['carrera']   ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars($f['carrera']     ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo $f['auxiliar'] ? 'SI' : 'NO'; ?></td>
                         <td><?php echo htmlspecialchars($f['referente_1'] ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars($f['referente_2'] ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars($f['referente_3'] ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars($f['partido']    ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars($f['trabajo']    ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars($f['sede']       ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars($f['municipio']  ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars($f['partido']     ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars($f['trabajo']     ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars($f['sede']        ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars($f['municipio']   ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
                         <?php
                         $votos = ['voto_cd_2021','voto_cd_2024','voto_cp_2017','voto_cp_2019','voto_cp_2021','voto_cp_2024'];
                         foreach ($votos as $v):
@@ -565,14 +579,16 @@ require_once 'includes/navbar.php';
 <script>
 (function () {
 
-    const comboPadron   = document.getElementById('combo-padron');
-    const comboAuxiliar = document.getElementById('combo-auxiliar');
-    const comboCarrera  = document.getElementById('combo-carrera');
+    const comboPadron    = document.getElementById('combo-padron');
+    const comboAuxiliar  = document.getElementById('combo-auxiliar');
+    const comboCarrera   = document.getElementById('combo-carrera');
+    const hiddenAuxiliar = document.getElementById('hidden-auxiliar');
 
     const scrollTop   = document.getElementById('scroll-top');
     const scrollTabla = document.getElementById('scroll-tabla');
     const inner       = document.getElementById('scroll-top-inner');
 
+    // Sincronizar scroll superior con la tabla
     if (scrollTop && scrollTabla && inner) {
         function ajustarAncho() {
             const tabla = document.getElementById('tabla-filtros');
@@ -589,26 +605,36 @@ require_once 'includes/navbar.php';
     }
 
     // Actualiza estado de combos segun padron seleccionado.
-    // CD: auxiliar deshabilitado y reseteado (los auxiliares no son de CD),
+    // CD: auxiliar deshabilitado (no aplica), hidden envia NO al PHP,
     //     carrera habilitada.
-    // CP: auxiliar habilitado, carrera deshabilitada y reseteada.
-    // Sin padron: todo deshabilitado.
+    // CP: auxiliar habilitado, hidden vacio (el combo visible envia el valor),
+    //     carrera deshabilitada y reseteada.
+    // Sin padron: todo deshabilitado, hidden vacio.
     function actualizarCombos() {
         const padron = comboPadron.value;
+
         if (padron === '') {
             comboAuxiliar.disabled = true;
             comboAuxiliar.value    = '';
             comboCarrera.disabled  = true;
             comboCarrera.value     = '';
+            hiddenAuxiliar.value   = '';
+
         } else if (padron === 'CD') {
+            // CD nunca tiene auxiliares CP: se deshabilita el combo y
+            // el hidden garantiza que auxiliar_cp = NO llegue al PHP
             comboAuxiliar.disabled = true;
-            comboAuxiliar.value    = 'NO'; // CD nunca tiene auxiliares CP
+            comboAuxiliar.value    = 'NO';
             comboCarrera.disabled  = false;
+            hiddenAuxiliar.value   = 'NO';
+
         } else if (padron === 'CP') {
+            // CP: el usuario elige si incluye auxiliares o no
             comboAuxiliar.disabled = false;
             comboAuxiliar.value    = '';
             comboCarrera.disabled  = true;
             comboCarrera.value     = '';
+            hiddenAuxiliar.value   = ''; // el combo visible manda el valor
         }
     }
 
