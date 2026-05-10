@@ -517,7 +517,7 @@ require_once 'includes/navbar.php';
                             <?php endif; ?>
                         </td>
                         <td><?php echo htmlspecialchars($f['carrera']     ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo $f['auxiliar'] ? 'SI' : 'NO'; ?></td>
+                        <td><?php echo htmlspecialchars($f['auxiliar'], ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars($f['referente_1'] ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars($f['referente_2'] ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars($f['referente_3'] ?? '—', ENT_QUOTES, 'UTF-8'); ?></td>
