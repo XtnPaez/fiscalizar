@@ -1,7 +1,7 @@
 # Fiscalizar
 
 ![Estado](https://img.shields.io/badge/estado-en_desarrollo-blue)
-![Base de datos](https://img.shields.io/badge/base_de_datos-migrada-green)
+![Base de datos](https://img.shields.io/badge/base_de_datos-actualizada-green)
 ![Etapa](https://img.shields.io/badge/etapa-consulta_padron_v1-green)
 ![PHP](https://img.shields.io/badge/PHP-8.1-777BB4)
 ![MariaDB](https://img.shields.io/badge/MariaDB-10.6-4479A1)
@@ -13,12 +13,16 @@ Sistema de gestion de padrones y fiscalizacion electoral para la Facultad de Cie
 
 ## Descripcion general
 
-La Facultad de Ciencias Sociales realiza dos procesos electorales independientes:
+La Facultad de Ciencias Sociales realiza cuatro procesos electorales independientes:
 
 - **Eleccion de Consejo Directivo (CD):** habilita a graduados de todas las carreras de la facultad.
-- **Eleccion de Ciencia Politica (CP):** habilita a graduados de esa carrera y a docentes auxiliares, que pueden ser graduados de otras facultades o de otras carreras de Sociales.
+- **Eleccion de Ciencia Politica (CP):** habilita a graduados de CP y a docentes auxiliares de esa carrera.
+- **Eleccion de Relaciones del Trabajo (RT):** habilita a graduados de RT y a docentes auxiliares de esa carrera.
+- **Eleccion de Sociologia (CS):** habilita a graduados de CS y a docentes auxiliares de esa carrera.
 
-Este sistema gestiona los padrones de ambos procesos, permite cruzar y analizar vinculos con referentes, espacios politicos y lugares de trabajo, registra la participacion historica en elecciones anteriores, y en su etapa final incorpora el registro de votos en tiempo real durante el dia de la eleccion.
+Los graduados votan en CD. Los auxiliares votan en la carrera donde son auxiliares, no en CD. Un auxiliar puede serlo en mas de una carrera simultaneamente.
+
+Este sistema gestiona los padrones de todos los procesos, permite cruzar y analizar vinculos con referentes, espacios politicos y lugares de trabajo, registra la participacion historica en elecciones anteriores, y en su etapa final incorpora el registro de votos en tiempo real durante el dia de la eleccion.
 
 ---
 
@@ -26,7 +30,7 @@ Este sistema gestiona los padrones de ambos procesos, permite cruzar y analizar 
 
 **Consulta Padron v1** — completa
 
-Sistema web de consulta y analisis del padron de graduados. Buscador con sugerencias en tiempo real, padrones paginados con buscador interno, filtros combinables con perfil completo, ABM de catalogos y personas, exportacion a Excel en todos los modulos.
+Sistema web de consulta y analisis del padron de graduados. Buscador, padrones paginados, filtros combinables, ABM de catalogos y personas, exportacion a Excel en todos los modulos. Consume `vista_padron_cd` y `vista_padron_cp`.
 
 **Consulta Padron v2** — pendiente
 
@@ -34,7 +38,7 @@ Ampliacion de funcionalidades de consulta, reporte y cruce de datos.
 
 **Fiscalizacion** — pendiente
 
-Modulo electoral completo: registro de elecciones, mesas, fiscales y votos en tiempo real.
+Modulo electoral completo: registro de elecciones, mesas, fiscales y votos en tiempo real. Incorpora los padrones RT y CS.
 
 ---
 
@@ -68,7 +72,7 @@ Usuario de desarrollo: fiscaliz_dev con acceso completo a fiscaliz_padron.
 
 **DNI como clave unica de cruce.** Toda relacion entre tablas usa el DNI como nexo.
 
-**Los padrones se mantienen puros.** padron_cd y padron_cp se cargan tal como los entrega la facultad, con todos sus campos originales.
+**Los padrones se mantienen puros.** Los cuatro padrones (CD, CP, RT, CS) se cargan tal como los entrega la facultad, con todos sus campos originales.
 
 **personas es el nucleo de consolidacion.** Un registro unico por DNI. Es el punto de joineo de todas las tablas.
 
@@ -78,7 +82,7 @@ Usuario de desarrollo: fiscaliz_dev con acceso completo a fiscaliz_padron.
 
 **Solo se registran los que votaron.** participacion_electoral contiene unicamente los DNIs que votaron en cada eleccion. Quien no figura, no voto.
 
-**Todo exportable a Excel.** Las vistas se diseñan planas y limpias para exportacion directa. El PHP construye el Excel dinamicamente desde las columnas del resultado.
+**Todo exportable a Excel.** Las vistas se diseñan planas y limpias para exportacion directa.
 
 **Todas las tablas se administran igual.** El administrador las obtiene, las tunea y las sube. El sistema las consume joineando por DNI.
 
@@ -124,6 +128,7 @@ fiscalizar/
     ├── modulos/
     │   ├── login/
     │   ├── logout/
+    │   ├── error/
     │   ├── buscador/
     │   ├── padrones/
     │   ├── filtros/
@@ -146,7 +151,8 @@ fiscalizar/
 |---|---|
 | Analisis de base de datos anterior | Completo |
 | Diseño de nueva base de datos | Completo |
-| Migracion de datos | Completo — pendiente validacion profunda antes de produccion |
+| Migracion de datos | Completo |
+| Actualizacion padrones 2026 | Completo |
 | Instalacion y configuracion local | Completo |
 | Consulta Padron v1 | Completo |
 | Consulta Padron v2 | Pendiente |

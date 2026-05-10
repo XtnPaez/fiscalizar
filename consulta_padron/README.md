@@ -1,6 +1,6 @@
 # Consulta Padron
 
-![Estado](https://img.shields.io/badge/estado-en_desarrollo-blue)
+![Estado](https://img.shields.io/badge/estado-completo-green)
 ![PHP](https://img.shields.io/badge/PHP-8.1-777BB4)
 ![Bootstrap](https://img.shields.io/badge/Bootstrap-5-7952B3)
 ![PhpSpreadsheet](https://img.shields.io/badge/PhpSpreadsheet-2.0-217346)
@@ -45,10 +45,7 @@ El archivo config/db.php incluye la siguiente linea despues de crear la conexion
 $pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
 ```
 
-Esta linea es obligatoria. Sin ella, las queries que combinan vista_padron_cd
-(utf8mb4_spanish_ci) con vista_padron_cp (utf8mb4_unicode_ci) via UNION fallan
-con error 1271 de collation. Se resuelve forzando una collation uniforme
-en toda la sesion desde la conexion.
+Esta linea es obligatoria. Sin ella, las queries que combinan vista_padron_cd (utf8mb4_spanish_ci) con vista_padron_cp (utf8mb4_unicode_ci) via UNION fallan con error 1271 de collation.
 
 ---
 
@@ -87,12 +84,14 @@ consulta_padron/
 ├── modulos/
 │   ├── login/
 │   │   └── login.php
+│   ├── logout/
+│   │   └── logout.php
 │   ├── error/
 │   │   └── error.php
 │   ├── buscador/
 │   │   └── buscador.php
-│   ├── listados/
-│   │   └── listados.php
+│   ├── padrones/
+│   │   └── padrones.php
 │   ├── filtros/
 │   │   └── filtros.php
 │   ├── abm_referentes/
@@ -108,25 +107,27 @@ consulta_padron/
 └── assets/
     ├── css/
     │   └── estilos.css
-    └── js/
-        └── main.js
+    ├── js/
+    │   └── main.js
+    └── img/
 ```
 
 ---
 
 ## Routing
 
-No hay framework de routing. index.php recibe todos los requests y decide que modulo cargar segun el parametro mod en la URL.
+No hay framework de routing. index.php recibe todos los requests y decide que modulo cargar segun el parametro mod en la URL. Cualquier excepcion no manejada es capturada por un try/catch global en index.php y redirige al modulo error sin romper la sesion.
 
 ```
 /?mod=buscador
-/?mod=listados
+/?mod=padrones
 /?mod=filtros
 /?mod=abm_referentes
 /?mod=abm_partidos
 /?mod=abm_trabajos
 /?mod=abm_personas
 /?mod=abm_usuarios
+/?mod=error
 ```
 
 Sin parametro mod carga el buscador por defecto. Sin sesion activa redirige al login.
@@ -139,7 +140,7 @@ Sistema de login propio, independiente del modulo de Fiscalizacion. Los usuarios
 
 | Nivel | Puede hacer |
 |---|---|
-| consulta | Buscador, listados, filtros. Solo lectura. |
+| consulta | Buscador, padrones, filtros. Solo lectura. |
 | admin | Todo lo anterior mas ABM de referentes, partidos, trabajos y personas. |
 | superadmin | Todo lo anterior mas ABM de usuarios. Hay uno solo. |
 
@@ -160,7 +161,7 @@ auth.php expone tres funciones:
 | Login | modulos/login/login.php | Publico |
 | Error | modulos/error/error.php | Todos |
 | Buscador | modulos/buscador/buscador.php | Todos |
-| Listados | modulos/listados/listados.php | Todos |
+| Padrones | modulos/padrones/padrones.php | Todos |
 | Filtros | modulos/filtros/filtros.php | Todos |
 | ABM Referentes | modulos/abm_referentes/abm_referentes.php | admin, superadmin |
 | ABM Partidos | modulos/abm_partidos/abm_partidos.php | admin, superadmin |
@@ -172,11 +173,11 @@ auth.php expone tres funciones:
 
 Home del sistema. Input de busqueda por apellido o DNI. Resultados en tabla con columnas DNI, apellido, nombre, carrera, padron y boton Ver mas por fila. Si hay un unico resultado redirige directamente al perfil. Todo descargable en Excel.
 
-### Listados
+### Padrones
 
-Tabla de listados disponibles con botones Ver y Descargar por fila. Al ver, el listado aparece paginado debajo (50 registros por pagina). Descargar genera el Excel completo sin paginacion.
+Tabla de listados disponibles con botones Ver y Descargar por fila. Al ver, el listado aparece paginado debajo (50 registros por pagina) con buscador interno por apellido. Descargar genera el Excel completo sin paginacion.
 
-Listados iniciales:
+Listados disponibles:
 
 | Nombre | Fuente |
 |---|---|
@@ -187,17 +188,18 @@ Listados iniciales:
 
 ### Filtros
 
-Padron y Auxiliares CP son obligatorios. Sin ambos elegidos no hay resultado.
+Padron y Auxiliares CP son obligatorios. Cuando el padron elegido es CD, el combo Auxiliares CP se deshabilita automaticamente y envia NO al PHP via hidden input.
 
 **Combos disponibles:**
 
 | Combo | Opciones | Notas |
 |---|---|---|
 | Padron | CD / CP | Obligatorio. |
-| Auxiliares CP | SI / NO | Obligatorio. Se inhibe si no hay padron elegido. |
+| Auxiliares CP | SI / NO | Obligatorio. Se deshabilita si padron = CD. |
 | Referente | Lista de activos + Con referentes | Opcional. |
 | Partido | Lista de activos | Opcional. |
 | Trabajo | Lista de activos | Opcional. |
+| Sede | Lista de activas | Opcional. |
 | Carrera | Lista de carreras | Opcional. Se inhibe si padron = CP. |
 | Eleccion | Todas las elecciones | Opcional. |
 | Voto | Voto / No voto | Opcional. Aplica a la eleccion elegida. |
@@ -211,27 +213,25 @@ Padron y Auxiliares CP son obligatorios. Sin ambos elegidos no hay resultado.
 | CP | NO | Solo graduados CP sin auxiliares |
 | CP | SI | Padron CP completo |
 
-**Columnas de resultado:** siempre presentes las seis columnas de votos
-(CD 2021, CD 2024, CP 2017, CP 2019, CP 2021, CP 2024) independientemente
-del padron elegido. Las columnas sin dato para ese padron muestran NO.
+**Columnas de resultado:** siempre presentes las seis columnas de votos (CD 2021, CD 2024, CP 2017, CP 2019, CP 2021, CP 2024). Las columnas sin dato para ese padron muestran NO. Los campos sin dato muestran texto explicito (SIN REFERENTE, SIN PARTIDO, etc.) en lugar de guion.
 
 Todo resultado es descargable en Excel.
 
 ### ABM Referentes, Partidos, Trabajos
 
-Listado del catalogo con opciones editar y dar de baja logica. Formulario para agregar nuevo registro. Nunca se elimina un registro fisicamente.
-
-Los registros con activo = 0 no aparecen en los combos de filtros ni en las vistas del padron.
+Listado del catalogo con opciones editar y dar de baja logica. Formulario para agregar nuevo registro. Nunca se elimina un registro fisicamente. Los registros con activo=0 no aparecen en los combos de filtros ni en las vistas.
 
 ### ABM Personas
 
-Flujo de tres pasos: buscar persona por apellido o DNI, ver fila completa con datos actuales, editar vinculos (referentes, partido, trabajo) via combos de los catalogos correspondientes.
-
-Solo aparecen en los combos los referentes, partidos y trabajos con activo = 1.
+Flujo de tres pasos: buscar persona por apellido o DNI, ver fila completa con datos actuales, editar vinculos (referentes, partido, trabajo) via combos de los catalogos correspondientes. Solo aparecen en los combos los registros con activo=1.
 
 ### ABM Usuarios
 
 Solo superadmin. Listado con nombre, nivel y estado. Opciones de editar nivel, activar, desactivar. Formulario para crear nuevo usuario. Passwords con hash bcrypt. El superadmin no puede desactivarse a si mismo.
+
+### Error
+
+Pagina de error generica. Se carga automaticamente cuando cualquier modulo lanza una excepcion no manejada. Muestra mensaje amigable y boton para volver al inicio. La sesion se mantiene activa.
 
 ---
 
@@ -251,15 +251,14 @@ Resumen:
 
 - PHP en UTF-8 sin BOM. Indentacion con 4 espacios. Variables en snake_case. Sin closing tag al final de archivos PHP puros.
 - Siempre prepared statements con PDO. Nunca concatenacion de variables en queries.
-- Parametros posicionales (?) en lugar de nombrados cuando una query combina resultados
-  de vista_padron_cd y vista_padron_cp via UNION. Evita conflicto HY093 al hacer array_merge.
+- Parametros posicionales (?) en lugar de nombrados cuando una query combina resultados de vista_padron_cd y vista_padron_cp via UNION. Evita conflicto HY093 al hacer array_merge.
 - Todo input del usuario se trata como potencialmente malicioso. htmlspecialchars() en todo output a pantalla.
 - Todo bloque de logica no trivial va comentado. Los archivos empiezan con un comentario que indica su rol.
+- Los campos disabled en formularios no se envian. Usar hidden inputs para garantizar que el valor llegue al PHP.
 
 ---
 
 ## Pendientes
 
-- Cargar sede_laboral cuando el administrador tenga el listado tuneado.
 - Validacion profunda de consistencia de datos migrados antes del pase a produccion.
 - Modulo de Fiscalizacion (etapa futura, sistema separado con login propio).
