@@ -70,6 +70,9 @@ TABLAS STAGING (prefijo st_, fuente de migraciones y actualizaciones)
     st_padron_cp_2026
     st_padron_rt_2026
     st_padron_cs_2026
+    st_padron_ts_2026           (TS queda solo en staging, sin tabla productiva)
+    st_padron_cc_2026           (CC queda solo en staging, sin tabla productiva)
+    st_dni_carrera              (auxiliar: una sigla por DNI para reconstruir padron_cd.sigla)
     st_padron_profesores_cp_2026
     st_actualizacion_referentes_2026
     st_bajas_padron_cd_2026
@@ -110,7 +113,7 @@ Un DNI aparece aqui si esta en cualquiera de los cuatro padrones. Si alguien est
 ---
 
 ### `padron_cd`
-**Rol:** padron oficial de Consejo Directivo tal como lo publica la facultad. Contiene graduados de todas las carreras. Acumulativo: solo se agregan registros, nunca se eliminan. A partir de 2026 el padron oficial ya no incluye la sigla de carrera — ese campo queda NULL para los registros nuevos.
+**Rol:** padron oficial de Consejo Directivo tal como lo publica la facultad. Contiene graduados de todas las carreras. Acumulativo: solo se agregan registros, nunca se eliminan. A partir de 2026 el padron oficial ya no incluye la sigla de carrera — ese campo se reconstruye cruzando contra los padrones de carrera via `st_dni_carrera`. Los 13 DNIs que no pudieron identificarse quedan con sigla NS (id=98 en `carreras`).
 
 | Campo | Tipo | Descripcion |
 |---|---|---|
@@ -194,7 +197,10 @@ Un DNI aparece aqui si esta en cualquiera de los cuatro padrones. Si alguien est
 | 3 | Relaciones del Trabajo | RT |
 | 4 | Trabajo Social | TS |
 | 5 | Ciencias de la Comunicacion | CC |
+| 98 | No identificada | NS |
 | 99 | Sin dato | SD |
+
+**Nota:** id=98 (NS) se reserva para graduados en `padron_cd` cuya carrera no pudo identificarse cruzando contra ningún padrón de carrera ni contra el padrón histórico 2024.
 
 ---
 

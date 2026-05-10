@@ -180,7 +180,40 @@ Las vistas `vista_padron_cd` y `vista_padron_cp` fueron recreadas con:
 - COALESCE en todos los campos opcionales: devuelven texto explicito (SIN REFERENTE, SIN PARTIDO, SIN TRABAJO, SIN SEDE, SIN MUNICIPIO) en lugar de NULL.
 - Campo `auxiliar` en `vista_padron_cp` devuelve SI/NO como texto en lugar de 1/0.
 
-### Resultado final
+### Reconstruccion del campo sigla en padron_cd
+
+El padron CD 2026 no incluye la sigla de carrera. Se reconstruyo cruzando contra los cinco padrones de carrera via la tabla staging `st_dni_carrera`.
+
+**Tablas staging adicionales cargadas:**
+
+| Tabla | Registros |
+|---|---|
+| `st_padron_ts_2026` | 2.936 |
+| `st_padron_cc_2026` | 4.504 |
+| `st_dni_carrera` | 22.103 |
+
+TS y CC quedan solo en staging — no tienen tabla productiva.
+
+**Proceso:**
+
+1. Se pobló `st_dni_carrera` uniendo los cinco padrones de carrera con prioridad CP > CS > RT > TS > CC. Un DNI con múltiples carreras toma la de mayor prioridad.
+2. UPDATE `padron_cd` desde `st_dni_carrera` por DNI → 21.394 filas resueltas.
+3. Los 351 sin match se buscaron en `st_padron_cd_2024` → 335 filas resueltas.
+4. Tres casos con DNI erróneo identificados por apellido y nombre → corregidos manualmente (FERRARIO EMILIA CP, MARTINEZ CLARISA LORENA TS, PALUMBO NANCY EMILSE CC).
+5. Se agregó id=98 (NS, No identificada) al catalogo `carreras`.
+6. Los 13 DNIs restantes se marcaron con sigla NS.
+
+**Resultado:**
+
+| Fuente | DNIs resueltos |
+|---|---|
+| Padrones de carrera 2026 | 21.394 |
+| Padron CD 2024 | 335 |
+| Correccion manual | 3 |
+| NS (no identificados) | 13 |
+| **Total** | **21.745** |
+
+---
 
 | Tabla | Registros | Estado |
 |---|---|---|
