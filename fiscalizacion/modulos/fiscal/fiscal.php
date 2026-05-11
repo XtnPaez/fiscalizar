@@ -89,11 +89,9 @@ require_once 'includes/navbar.php';
     </div>
 </div>
 
-<!-- Mensaje de exito -->
-<div id="msg-exito" class="alert alert-success text-center fw-semibold"
-    style="display:none;font-size:1rem;">
-    ✓ Voto registrado
-</div>
+<!-- Mensaje de resultado — color segun tipo de voto o error -->
+<div id="msg-exito" class="alert text-center fw-semibold"
+    style="display:none;font-size:1rem;"></div>
 
 <!-- Modal de confirmacion -->
 <div class="modal fade" id="modal-confirmar" tabindex="-1" aria-hidden="true">
@@ -329,27 +327,54 @@ require_once 'includes/navbar.php';
         .then(r => r.json())
         .then(function (data) {
             if (data.ok) {
-                // Exito: mostrar mensaje motivador aleatorio y limpiar
-                panelVoto.style.display = 'none';
-                msgExito.textContent    = mensajeAleatorio();
-                msgExito.style.display  = 'block';
-                inputBusqueda.value     = '';
+                panelVoto.style.display     = 'none';
                 divResultados.style.display = 'none';
+                inputBusqueda.value         = '';
+
+                const frase = mensajeAleatorio();
+
+                if (tipoVotoPendiente === 'regular') {
+                    // Voto regular — fondo verde
+                    msgExito.className   = 'alert text-center fw-semibold';
+                    msgExito.style.backgroundColor = '#28a745';
+                    msgExito.style.color           = '#fff';
+                    msgExito.style.border          = 'none';
+                    msgExito.innerHTML   = frase;
+                } else {
+                    // Voto observado — fondo rojo + aviso fiscal general
+                    msgExito.className   = 'alert text-center fw-semibold';
+                    msgExito.style.backgroundColor = '#dc3545';
+                    msgExito.style.color           = '#fff';
+                    msgExito.style.border          = 'none';
+                    msgExito.innerHTML   = frase + '<br><span style="font-size:0.85rem;font-weight:400;">Avisale al fiscal general</span>';
+                }
+
+                msgExito.style.display  = 'block';
                 personaSeleccionada     = null;
                 tipoVotoPendiente       = null;
 
-                // Volver al buscador limpio despues de 2 segundos
                 setTimeout(function () {
                     msgExito.style.display = 'none';
                     inputBusqueda.focus();
                 }, 2000);
 
             } else {
-                alert((data.error || 'No se pudo registrar el voto.') + ' Avisale al fiscal general.');
+                // Error — fondo amarillo, sin frase motivadora
+                msgExito.className   = 'alert text-center fw-semibold';
+                msgExito.style.backgroundColor = '#ffc107';
+                msgExito.style.color           = '#1a1a2e';
+                msgExito.style.border          = 'none';
+                msgExito.innerHTML   = 'Voto no registrado. Avisale al fiscal general.';
+                msgExito.style.display = 'block';
             }
         })
         .catch(function () {
-            alert('Error de conexion. Intenta de nuevo. Avisale al fiscal general.');
+            msgExito.className   = 'alert text-center fw-semibold';
+            msgExito.style.backgroundColor = '#ffc107';
+            msgExito.style.color           = '#1a1a2e';
+            msgExito.style.border          = 'none';
+            msgExito.innerHTML   = 'Voto no registrado. Avisale al fiscal general.';
+            msgExito.style.display = 'block';
         });
     });
 
@@ -384,7 +409,27 @@ require_once 'includes/navbar.php';
         'Cuidando votos, cuidando derechos.',
         'Mesa protegida exitosamente.',
         'Registro exitoso, siga siga.',
-        'Un voto más, impecable.'
+        'Un voto más, impecable.',
+        'Fiscal atento, país contento.',
+        'Otro voto bien cuidado.',
+        'Democracia funcionando correctamente.',
+        'Registro completado con éxito.',
+        'Mesa firme, fiscal firme.',
+        'Control total activado.',
+        'Seguimos sumando transparencia.',
+        'Voto validado, gran trabajo.',
+        'Fiscalizando sin descanso.',
+        'Todo bajo supervisión democrática.',
+        'Una mesa bien cuidada.',
+        'Tu control hace diferencia.',
+        'Democracia protegida exitosamente.',
+        'Confirmado y resguardado.',
+        'Otro voto en buenas manos.',
+        'Fiscal premium detectado.',
+        'La mesa sigue impecable.',
+        'Excelente ritmo electoral.',
+        'Orden, control y democracia.',
+        'Voto registrado, próxima misión.'
     ];
 
     function mensajeAleatorio() {
