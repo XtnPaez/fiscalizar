@@ -41,6 +41,21 @@ Un usuario de Consulta Padron no tiene acceso a Fiscalizacion y viceversa.
 
 ---
 
+## Procesos electorales
+
+Fiscalizacion cubre los cuatro procesos electorales de la facultad:
+
+| Proceso | Tipo | Padron |
+|---|---|---|
+| Consejo Directivo | cd | padron_cd |
+| Ciencia Politica | cp | padron_cp |
+| Relaciones del Trabajo | rt | padron_rt |
+| Sociologia | cs | padron_cs |
+
+Cada proceso tiene sus propias mesas. No hay mesas mixtas. El fiscal solo ve el padron de su mesa.
+
+---
+
 ## Roles y pantallas
 
 ### Fiscal
@@ -60,9 +75,9 @@ El fiscal no ve estadisticas de ningun tipo.
 
 ### Admin
 
-- Dashboard con estadisticas en tiempo real (votaron / faltan / % por mesa).
-- Listados del padron CD y CP con columna de voto del dia.
-- Filtros por referente igual que en Consulta Padron, con voto del dia incluido.
+- Dashboard con estado de mesas en tiempo real (logueadas / caidas) y conteo de votos por eleccion.
+- Reset de mesa desde el dashboard (libera en_uso=0 para que el fiscal pueda reloguearse).
+- Tab de listados: padron completo de cada eleccion con columna de voto del dia, filtrable por voto/no voto.
 
 ### Superadmin
 
@@ -81,8 +96,8 @@ Estas tablas se agregan a fiscaliz_padron sin modificar las existentes.
 | Campo | Tipo | Descripcion |
 |---|---|---|
 | `id` | INT | PK. AUTO_INCREMENT. |
-| `nombre` | VARCHAR(60) | Ej: LU CP M1, MA CD M3. |
-| `tipo` | ENUM('cd','cp') | Tipo de padron que atiende. |
+| `nombre` | VARCHAR(60) | Ej: CD M1, CP M3, RT M1. |
+| `tipo` | ENUM('cd','cp','rt','cs') | Tipo de padron que atiende. |
 | `password` | VARCHAR(255) | Hash bcrypt. Lo cambia superadmin. |
 | `habilitada` | TINYINT(1) | 1 = aparece en combo login. Default 0. |
 | `en_uso` | TINYINT(1) | 1 = hay sesion activa en esta mesa. Default 0. |
@@ -91,7 +106,7 @@ Estas tablas se agregan a fiscaliz_padron sin modificar las existentes.
 Logica de en_uso:
 - Al login exitoso de una mesa: en_uso = 1.
 - Al logout del fiscal: en_uso = 0.
-- Si el telefono se cuelga: superadmin pone en_uso = 0 desde ABM mesas.
+- Si el telefono se cuelga o hay cambio de fiscal: admin pone en_uso = 0 desde el dashboard.
 - El combo del login muestra solo mesas con habilitada = 1 AND en_uso = 0.
 
 ### `usuarios_fiscal`
@@ -110,12 +125,14 @@ Solo para superadmin y admin. Los fiscales no tienen fila aqui.
 
 Registro en tiempo real del dia de la eleccion.
 Al cerrar la eleccion sus registros se migran a participacion_electoral.
+UNIQUE KEY sobre (dni, id_eleccion) para evitar doble voto a nivel motor.
 
 | Campo | Tipo | Descripcion |
 |---|---|---|
 | `id` | INT | PK. AUTO_INCREMENT. |
 | `dni` | INT UNSIGNED | DNI del votante. |
 | `id_mesa` | INT | FK a mesas. |
+| `id_eleccion` | INT | FK a elecciones. |
 | `tipo_voto` | ENUM('regular','observado') | Default regular. |
 | `timestamp` | DATETIME | Fecha y hora. Default CURRENT_TIMESTAMP. |
 
@@ -128,7 +145,7 @@ Pantalla unica con dos secciones visualmente separadas.
 Seccion superior — Fiscales:
 - Combo con mesas habilitadas y no en uso (habilitada=1 AND en_uso=0).
 - Campo password.
-- Al autenticar: sesion con rol=fiscal, id_mesa, tipo_mesa, nombre_mesa.
+- Al autenticar: sesion con rol=fiscal, id_mesa, tipo_mesa, nombre_mesa, id_eleccion.
 
 Seccion inferior — Admin y Superadmin:
 - Campo usuario.
@@ -146,8 +163,14 @@ Numerico  → filtra por DNI en el padron de su mesa
 Texto     → filtra por apellido y nombre en el padron de su mesa
 ```
 
-La busqueda consulta solo el padron correspondiente al tipo de mesa
-(padron_cd si tipo=cd, padron_cp si tipo=cp).
+La busqueda consulta el padron correspondiente al tipo de mesa:
+
+| tipo_mesa | Tabla consultada |
+|---|---|
+| cd | padron_cd |
+| cp | padron_cp |
+| rt | padron_rt |
+| cs | padron_cs |
 
 Los resultados se actualizan en tiempo real sin recargar la pagina.
 Las personas que ya votaron aparecen bloqueadas con badge YA VOTO.
@@ -159,8 +182,9 @@ Las personas que ya votaron aparecen bloqueadas con badge YA VOTO.
 ```
 $_SESSION['rol']         = 'fiscal'
 $_SESSION['id_mesa']     = id de la mesa
-$_SESSION['tipo_mesa']   = 'cd' o 'cp'
+$_SESSION['tipo_mesa']   = 'cd', 'cp', 'rt' o 'cs'
 $_SESSION['nombre_mesa'] = nombre legible de la mesa
+$_SESSION['id_eleccion'] = id de la eleccion activa del tipo de mesa
 ```
 
 El logout destruye la sesion y pone mesas.en_uso = 0.
@@ -186,14 +210,16 @@ fiscalizacion/
 ├── modulos/
 │   ├── login/
 │   │   └── login.php
+│   ├── logout/
+│   │   └── logout.php
+│   ├── error/
+│   │   └── error.php
 │   ├── fiscal/
 │   │   └── fiscal.php      <- pantalla del fiscal: busqueda AJAX + voto
 │   ├── dashboard/
-│   │   └── dashboard.php   <- estadisticas en tiempo real (admin)
+│   │   └── dashboard.php   <- estado mesas + conteo votos (admin)
 │   ├── listados/
 │   │   └── listados.php    <- padron con voto del dia (admin)
-│   ├── filtros/
-│   │   └── filtros.php     <- filtros por referente con voto del dia (admin)
 │   ├── abm_mesas/
 │   │   └── abm_mesas.php   <- superadmin
 │   └── abm_usuarios/
@@ -211,14 +237,15 @@ fiscalizacion/
 ## Routing
 
 Mismo patron que consulta_padron. index.php decide el modulo segun ?mod=.
+Cualquier excepcion no manejada redirige a error sin romper la sesion.
 
 ```
 /?mod=fiscal        <- fiscal autenticado
 /?mod=dashboard     <- admin, superadmin
 /?mod=listados      <- admin, superadmin
-/?mod=filtros       <- admin, superadmin
 /?mod=abm_mesas     <- superadmin
 /?mod=abm_usuarios  <- superadmin
+/?mod=error         <- todos
 ```
 
 Sin mod carga login. Sin sesion redirige al login.
@@ -230,7 +257,7 @@ Sin mod carga login. Sin sesion redirige al login.
 | Nivel | Modulos habilitados |
 |---|---|
 | fiscal | fiscal |
-| admin | dashboard, listados, filtros |
+| admin | dashboard, listados |
 | superadmin | todo lo anterior mas abm_mesas, abm_usuarios |
 
 auth.php expone:
@@ -246,10 +273,10 @@ auth.php expone:
 1. DDL — mesas, usuarios_fiscal, votos_dia
 2. Login — pantalla unica dos secciones
 3. Pantalla fiscal — busqueda AJAX, confirmacion voto, logout
-4. ABM mesas — superadmin
-5. ABM usuarios — superadmin
-6. Dashboard — estadisticas tiempo real
-7. Listados y filtros — admin
+4. Dashboard — estado mesas + conteo votos (admin)
+5. Listados — padron con voto del dia (admin)
+6. ABM mesas — superadmin
+7. ABM usuarios — superadmin
 8. Migracion votos_dia a participacion_electoral al cierre
 ```
 
@@ -268,17 +295,9 @@ Sin esta linea las queries que combinan vistas de distintas collations fallan.
 
 ---
 
-## Pendientes antes de arrancar desarrollo
-
-- Crear DDL de las tres tablas en fiscaliz_padron.
-- Configurar db.php local apuntando a MySQL de Wiroos.
-- Crear usuario superadmin en usuarios_fiscal.
-
----
-
 ## Documentacion relacionada
 
-- [docs/analisis_bbdd.md](../docs/analisis_bbdd.md)
 - [docs/propuesta_bbdd.md](../docs/propuesta_bbdd.md)
 - [docs/convenciones.md](../docs/convenciones.md)
 - [sql/estructura/fiscaliz_padron.sql](../sql/estructura/fiscaliz_padron.sql)
+- [sql/migracion/migracion.md](../sql/migracion/migracion.md)
