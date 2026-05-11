@@ -428,7 +428,11 @@ Idem para CP. El campo `auxiliar` devuelve SI o NO como texto.
 ### Notas de diseno de las vistas
 
 - Los JOIN a `referentes` incluyen `AND r.activo = 1`. Un referente dado de baja no aparece en el resultado.
-- COALESCE en todos los campos opcionales: devuelven texto explicito en lugar de NULL.
+- Todos los campos sin dato devuelven el texto `SIN DATO` de forma uniforme. Se resuelve con NULLIF + COALESCE para neutralizar los valores especiales de cada catalogo antes de aplicar el texto por defecto:
+  - Referentes: NULLIF sobre CONCAT(apellido, nombre) cuando el resultado es `SIN REFERENTE` (id=250)
+  - Partido: NULLIF sobre nombre cuando es `SIN ESPACIO POLITICO` (id=48)
+  - Trabajo: NULLIF sobre nombre cuando es `SIN DATO` (id=72) — queda igual pero el mecanismo es consistente
+  - Sede y municipio: COALESCE directo, el id=1 ya tiene nombre `SIN DATO`
 - Agregar una eleccion nueva requiere agregar un LEFT JOIN a `participacion_electoral` y una columna CASE WHEN en el SELECT. El PHP no se modifica.
 - Agregar una tabla nueva requiere agregar un LEFT JOIN por DNI. El PHP no se modifica.
 
