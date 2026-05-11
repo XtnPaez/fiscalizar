@@ -202,10 +202,7 @@ $mesas_disponibles = $stmt_mesas->fetchAll();
                                 <option value="" disabled selected>Elegir mesa</option>
                                 <?php foreach ($mesas_disponibles as $m): ?>
                                     <option value="<?php echo $m['id']; ?>">
-                                        <?php echo htmlspecialchars(
-                                            strtoupper($m['tipo']) . ' — ' . $m['nombre'] . ' — ' . $m['eleccion'],
-                                            ENT_QUOTES, 'UTF-8'
-                                        ); ?>
+                                        <?php echo htmlspecialchars($m['nombre'], ENT_QUOTES, 'UTF-8'); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
