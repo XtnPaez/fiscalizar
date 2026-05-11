@@ -5,9 +5,38 @@
 // Buscador por apellido o nombre arriba del listado.
 // Formulario agregar en collapse — requiere gesto explicito para abrir.
 // Botones editar y dar de baja en la misma fila.
+// Boton de descarga Excel del listado completo (con ID).
 // Nunca se elimina un registro fisicamente.
 
 verificar_admin();
+
+// --- Exportacion a Excel ---
+// Se procesa antes de cualquier output HTML para no romper los headers HTTP.
+// Se activa con GET accion=descargar. Ignora el filtro de busqueda: siempre exporta el listado completo.
+if (($_GET['accion'] ?? '') === 'descargar') {
+
+    require_once 'includes/excel.php';
+
+    // Consulta sin filtro de busqueda: listado completo ordenado igual que la pantalla
+    $stmt = $pdo->prepare("
+        SELECT
+            id,
+            apellido,
+            nombre,
+            CASE WHEN aplica_cd = 1 THEN 'SI' ELSE 'NO' END AS aplica_cd,
+            CASE WHEN aplica_cp = 1 THEN 'SI' ELSE 'NO' END AS aplica_cp,
+            CASE WHEN activo    = 1 THEN 'Activo' ELSE 'Baja' END AS estado
+        FROM referentes
+        ORDER BY apellido ASC, nombre ASC
+    ");
+    $stmt->execute();
+    $datos_excel = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Las columnas se construyen dinamicamente desde las claves del primer registro.
+    // El nombre del archivo sigue el patron del proyecto: nombre-YYYY-MM-DD.xlsx
+    exportar_excel($datos_excel, 'referentes-' . date('Y-m-d'));
+    exit;
+}
 
 $mensaje      = '';
 $error        = '';
@@ -108,7 +137,7 @@ if ($busqueda !== '') {
     $params_q[':q'] = '%' . strtoupper($busqueda) . '%';
 }
 
-// --- Listar referentes ---
+// --- Listar referentes (pantalla: respeta el filtro de busqueda si existe) ---
 $stmt       = $pdo->prepare("SELECT * FROM referentes $where_q ORDER BY apellido ASC, nombre ASC");
 $stmt->execute($params_q);
 $referentes = $stmt->fetchAll();
@@ -118,13 +147,20 @@ require_once 'includes/navbar.php';
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <div class="modulo-titulo mb-0">Referentes</div>
-    <button class="btn btn-acento btn-sm"
-        type="button"
-        data-bs-toggle="collapse"
-        data-bs-target="#form-agregar"
-        aria-expanded="<?php echo $abrir_form ? 'true' : 'false'; ?>">
-        + Agregar referente
-    </button>
+    <div class="d-flex gap-2">
+        <!-- Descarga el listado completo (sin filtro de busqueda) con ID incluido -->
+        <a href="index.php?mod=abm_referentes&accion=descargar"
+           class="btn btn-outline-secondary btn-sm">
+            Descargar Excel
+        </a>
+        <button class="btn btn-acento btn-sm"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#form-agregar"
+            aria-expanded="<?php echo $abrir_form ? 'true' : 'false'; ?>">
+            + Agregar referente
+        </button>
+    </div>
 </div>
 
 <?php if ($mensaje !== ''): ?>
