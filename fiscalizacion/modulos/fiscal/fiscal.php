@@ -27,26 +27,35 @@ require_once 'includes/navbar.php';
     </span>
 </div>
 
-<!-- Buscador -->
-<div class="mb-3 position-relative">
-    <input type="text"
-        id="input-busqueda"
-        class="form-control fiscal-busqueda"
-        placeholder="DNI o apellido..."
-        autocomplete="off"
-        autocorrect="off"
-        autocapitalize="off"
-        spellcheck="false">
+<!-- Buscador — input y boton en la misma fila -->
+<div class="mb-4">
+    <div class="d-flex gap-2 position-relative">
+        <div class="flex-grow-1 position-relative">
+            <input type="text"
+                id="input-busqueda"
+                class="form-control fiscal-busqueda"
+                placeholder="DNI o apellido..."
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+                spellcheck="false">
 
-    <!-- Sugerencias AJAX -->
-    <div id="sugerencias" class="list-group position-absolute w-100"
-        style="z-index:1000;display:none;top:100%;left:0;"></div>
+            <!-- Sugerencias AJAX — debajo del input, no tapa el boton -->
+            <div id="sugerencias" class="list-group position-absolute w-100"
+                style="z-index:1000;display:none;top:100%;left:0;
+                       background:#fff;border:1px solid #dee2e6;border-radius:6px;
+                       box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
+        </div>
+
+        <!-- Boton buscar al costado, fondo celeste -->
+        <button id="btn-buscar"
+            class="btn btn-sm fw-semibold"
+            style="background-color:#4f8ef7;color:#fff;border:none;
+                   white-space:nowrap;padding:0 1.2rem;">
+            Buscar
+        </button>
+    </div>
 </div>
-
-<!-- Boton buscar -->
-<button id="btn-buscar" class="btn btn-acento btn-sm mb-4 w-100">
-    Buscar
-</button>
 
 <!-- Resultados de busqueda -->
 <div id="resultados" class="mb-4" style="display:none;">
@@ -62,10 +71,14 @@ require_once 'includes/navbar.php';
             <div id="voto-nombre" class="fw-semibold"    style="font-size:1.1rem;"></div>
         </div>
         <div class="d-grid gap-2">
-            <button id="btn-regular" class="btn btn-acento">
+            <button id="btn-regular"
+                class="btn fw-bold"
+                style="background-color:#28a745;color:#fff;font-size:1.1rem;padding:0.75rem;">
                 VOTO REGULAR
             </button>
-            <button id="btn-observado" class="btn btn-outline-secondary">
+            <button id="btn-observado"
+                class="btn fw-bold"
+                style="background-color:#dc3545;color:#fff;font-size:1.1rem;padding:0.75rem;">
                 VOTO OBSERVADO
             </button>
             <button id="btn-cancelar" class="btn btn-link text-secondary btn-sm">
@@ -157,7 +170,7 @@ require_once 'includes/navbar.php';
             const item = document.createElement('button');
             item.type = 'button';
             item.className = 'list-group-item list-group-item-action py-2';
-            if (p.ya_voto) {
+            if (p.ya_voto == 1) {
                 item.classList.add('text-secondary');
                 item.style.opacity = '0.6';
             }
@@ -166,12 +179,12 @@ require_once 'includes/navbar.php';
                 escHtml(p.dni) + '</span>' +
                 '<strong>' + escHtml(p.apellido) + '</strong> ' +
                 escHtml(p.nombre) +
-                (p.ya_voto ? ' <span class="badge bg-danger ms-1" style="font-size:0.7rem;">YA VOTÓ</span>' : '');
+                (p.ya_voto == 1 ? ' <span class="badge bg-danger ms-1" style="font-size:0.7rem;">YA VOTÓ</span>' : '');
 
             item.addEventListener('click', function () {
                 ocultarSugerencias();
                 inputBusqueda.value = p.apellido + ' ' + p.nombre;
-                if (!p.ya_voto) {
+                if (p.ya_voto != 1) {
                     seleccionarPersona(p);
                 }
             });
@@ -231,7 +244,7 @@ require_once 'includes/navbar.php';
 
         data.forEach(function (p) {
             const tr = document.createElement('tr');
-            if (p.ya_voto) {
+            if (p.ya_voto == 1) {
                 tr.style.opacity = '0.5';
                 tr.style.color   = '#6c757d';
             } else {
@@ -245,7 +258,7 @@ require_once 'includes/navbar.php';
             tr.innerHTML =
                 '<td>' + escHtml(p.dni) + '</td>' +
                 '<td><strong>' + escHtml(p.apellido) + '</strong>' +
-                (p.ya_voto ? ' <span class="badge bg-danger ms-1" style="font-size:0.7rem;">YA VOTÓ</span>' : '') +
+                (p.ya_voto == 1 ? ' <span class="badge bg-danger ms-1" style="font-size:0.7rem;">YA VOTÓ</span>' : '') +
                 '</td>' +
                 '<td>' + escHtml(p.nombre) + '</td>';
             tbody.appendChild(tr);
