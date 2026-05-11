@@ -81,7 +81,8 @@ require_once 'includes/navbar.php';
                 style="background-color:#dc3545;color:#fff;font-size:1.1rem;padding:0.75rem;">
                 VOTO OBSERVADO
             </button>
-            <button id="btn-cancelar" class="btn btn-link text-secondary btn-sm">
+            <button id="btn-cancelar" class="btn btn-sm fw-semibold"
+                style="background-color:#6c757d;color:#fff;">
                 Cancelar
             </button>
         </div>
@@ -328,8 +329,9 @@ require_once 'includes/navbar.php';
         .then(r => r.json())
         .then(function (data) {
             if (data.ok) {
-                // Exito: mostrar mensaje y limpiar
+                // Exito: mostrar mensaje motivador aleatorio y limpiar
                 panelVoto.style.display = 'none';
+                msgExito.textContent    = mensajeAleatorio();
                 msgExito.style.display  = 'block';
                 inputBusqueda.value     = '';
                 divResultados.style.display = 'none';
@@ -343,15 +345,51 @@ require_once 'includes/navbar.php';
                 }, 2000);
 
             } else {
-                alert(data.error || 'No se pudo registrar el voto. Intenta de nuevo.');
+                alert((data.error || 'No se pudo registrar el voto.') + ' Avisale al fiscal general.');
             }
         })
         .catch(function () {
-            alert('Error de conexion. Intenta de nuevo.');
+            alert('Error de conexion. Intenta de nuevo. Avisale al fiscal general.');
         });
     });
 
-    // --- Utilidad: escapar HTML ---
+    // --- Mensajes motivadores al registrar voto exitoso ---
+    const mensajesExito = [
+        'Cada voto cuenta, literalmente.',
+        'Democracia en proceso.',
+        'Misión cumplida, fiscal.',
+        'Otro voto, otra garantía.',
+        'Seguimos cuidando la elección.',
+        'Bien ahí, guardian electoral.',
+        'Controlado y registrado.',
+        'La democracia te agradece.',
+        'Fiscalizando como campeón.',
+        'Un clic por transparencia.',
+        'Voto registrado correctamente.',
+        'Otro paso democrático.',
+        'Todo en orden, fiscal.',
+        'Precisión electoral activada.',
+        'Excelente trabajo de fiscalización.',
+        'Democracia nivel experto.',
+        'Sumando confianza al proceso.',
+        'Fiscal presente, fraude ausente.',
+        'Seguimos firmes en mesa.',
+        'Voto confirmado, mate pendiente.',
+        'Transparencia desbloqueada.',
+        'Otro voto bajo control.',
+        'Fiscalizando con estilo.',
+        'La urna sonríe.',
+        'Todo registrado perfectamente.',
+        'Check democrático realizado.',
+        'Cuidando votos, cuidando derechos.',
+        'Mesa protegida exitosamente.',
+        'Registro exitoso, siga siga.',
+        'Un voto más, impecable.'
+    ];
+
+    function mensajeAleatorio() {
+        return mensajesExito[Math.floor(Math.random() * mensajesExito.length)];
+    }
     function escHtml(str) {
         return String(str)
             .replace(/&/g, '&amp;')
