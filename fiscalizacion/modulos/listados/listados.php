@@ -8,6 +8,7 @@
 // Seccion 1 — Buscador de persona
 //   Input unico (apellido o DNI). Busca en todos los padrones de elecciones activas.
 //   Resultado: ELECCION | DNI | APELLIDO | NOMBRE | VOTO 2026
+//   Una fila por padron donde figura la persona. Sin duplicados.
 //   Descargable en Excel.
 //
 // Seccion 2 — Listado por eleccion
@@ -17,30 +18,25 @@
 //   Para CP/RT/CS: ELECCION | DNI | APELLIDO | NOMBRE | AUXILIAR | VOTO 2026
 //   Descargable en Excel.
 //   Fuente: vistas vista_fiscal_cd / vista_fiscal_cp / vista_fiscal_rt / vista_fiscal_cs
-//   Los filtros usan columnas de la vista aunque no se muestren todas en pantalla.
 
 verificar_admin_fiscal();
 
 require_once 'includes/excel.php';
 
 // ============================================================
-// EXPORTACION EXCEL — debe ejecutarse antes de cualquier output
-// El parametro export indica que seccion exportar
+// EXPORTACION EXCEL — antes de cualquier output HTML
 // ============================================================
 
 $export = $_GET['export'] ?? '';
 
-// --- Export: buscador ---
 if ($export === 'buscador') {
     $q = trim($_GET['q'] ?? '');
     if ($q !== '') {
-        $resultado_export = buscar_en_padrones($pdo, $q);
-        exportar_excel($resultado_export, 'busqueda-padron');
+        exportar_excel(buscar_en_padrones($pdo, $q), 'busqueda-padron');
     }
     exit;
 }
 
-// --- Export: listado por eleccion ---
 if ($export === 'listado') {
     $id_eleccion_export = intval($_GET['id_eleccion'] ?? 0);
     if ($id_eleccion_export > 0) {
@@ -51,9 +47,10 @@ if ($export === 'listado') {
                 'partido'   => trim($_GET['partido']   ?? ''),
                 'trabajo'   => trim($_GET['trabajo']   ?? ''),
             ];
-            $resultado_export = obtener_listado($pdo, $eleccion_export, $filtros_export);
-            $nombre_archivo   = 'listado-' . $eleccion_export['tipo'] . '-' . $eleccion_export['anio'];
-            exportar_excel($resultado_export, $nombre_archivo);
+            exportar_excel(
+                obtener_listado($pdo, $eleccion_export, $filtros_export),
+                'listado-' . $eleccion_export['tipo'] . '-' . $eleccion_export['anio']
+            );
         }
     }
     exit;
@@ -65,72 +62,102 @@ if ($export === 'listado') {
 
 // buscar_en_padrones()
 // Busca en todos los padrones de elecciones activas por apellido o DNI.
-// Devuelve una fila por padron donde figura la persona.
+// Devuelve UNA fila por padron donde figura la persona — sin duplicados.
+//
+// El voto se verifica con EXISTS + subquery sobre las mesas de la eleccion
+// activa del tipo correspondiente. Esto evita el producto cartesiano que
+// causaba duplicados cuando una eleccion tenia mas de un dia creado
+// (el LEFT JOIN a dias_eleccion x mesas multiplicaba las filas).
 function buscar_en_padrones(PDO $pdo, string $q): array {
     $es_dni = ctype_digit($q);
     $param  = $es_dni ? $q : $q . '%';
     $campo  = $es_dni ? 't.dni = ?' : 'p.apellido LIKE ?';
 
-    // Un SELECT por cada tipo de eleccion activa, unidos con UNION ALL
-    // Usamos parametros posicionales (?) para evitar conflicto HY093
+    // Subquery que devuelve los ids de mesas de la eleccion activa de un tipo.
+    // Se embebe en cada rama del UNION con el tipo como parametro posicional.
+    $sub_mesas = "
+        SELECT m.id FROM mesas m
+        JOIN dias_eleccion d ON m.id_dia = d.id
+        JOIN elecciones ex   ON d.id_eleccion = ex.id
+        WHERE ex.tipo = ? AND ex.estado = 'activa'
+    ";
+
+    // Cuatro ramas UNION ALL, una por tipo de padron.
+    // Parametros por rama: tipo (para sub_mesas) + param (para WHERE busqueda).
     $sql = "
-        SELECT e.nombre AS eleccion, p.dni, p.apellido, p.nombre,
-               CASE WHEN v.id IS NOT NULL THEN 'SI' ELSE 'NO' END AS voto_2026
+        SELECT
+            (SELECT nombre FROM elecciones
+             WHERE tipo = 'cd' AND estado = 'activa' LIMIT 1) AS eleccion,
+            p.dni, p.apellido, p.nombre,
+            CASE WHEN EXISTS (
+                SELECT 1 FROM votos_dia v
+                WHERE v.dni = p.dni AND v.id_mesa IN ($sub_mesas)
+            ) THEN 'SI' ELSE 'NO' END AS voto_2026
         FROM padron_cd t
-        JOIN personas p      ON t.dni = p.dni
-        JOIN elecciones e    ON e.tipo = 'cd' AND e.estado = 'activa'
-        LEFT JOIN dias_eleccion d ON d.id_eleccion = e.id
-        LEFT JOIN mesas m    ON m.id_dia = d.id
-        LEFT JOIN votos_dia v ON v.dni = p.dni AND v.id_mesa = m.id
+        JOIN personas p   ON t.dni = p.dni
+        JOIN elecciones e ON e.tipo = 'cd' AND e.estado = 'activa'
         WHERE $campo
 
         UNION ALL
 
-        SELECT e.nombre AS eleccion, p.dni, p.apellido, p.nombre,
-               CASE WHEN v.id IS NOT NULL THEN 'SI' ELSE 'NO' END AS voto_2026
+        SELECT
+            (SELECT nombre FROM elecciones
+             WHERE tipo = 'cp' AND estado = 'activa' LIMIT 1) AS eleccion,
+            p.dni, p.apellido, p.nombre,
+            CASE WHEN EXISTS (
+                SELECT 1 FROM votos_dia v
+                WHERE v.dni = p.dni AND v.id_mesa IN ($sub_mesas)
+            ) THEN 'SI' ELSE 'NO' END AS voto_2026
         FROM padron_cp t
-        JOIN personas p      ON t.dni = p.dni
-        JOIN elecciones e    ON e.tipo = 'cp' AND e.estado = 'activa'
-        LEFT JOIN dias_eleccion d ON d.id_eleccion = e.id
-        LEFT JOIN mesas m    ON m.id_dia = d.id
-        LEFT JOIN votos_dia v ON v.dni = p.dni AND v.id_mesa = m.id
+        JOIN personas p   ON t.dni = p.dni
+        JOIN elecciones e ON e.tipo = 'cp' AND e.estado = 'activa'
         WHERE $campo
 
         UNION ALL
 
-        SELECT e.nombre AS eleccion, p.dni, p.apellido, p.nombre,
-               CASE WHEN v.id IS NOT NULL THEN 'SI' ELSE 'NO' END AS voto_2026
+        SELECT
+            (SELECT nombre FROM elecciones
+             WHERE tipo = 'rt' AND estado = 'activa' LIMIT 1) AS eleccion,
+            p.dni, p.apellido, p.nombre,
+            CASE WHEN EXISTS (
+                SELECT 1 FROM votos_dia v
+                WHERE v.dni = p.dni AND v.id_mesa IN ($sub_mesas)
+            ) THEN 'SI' ELSE 'NO' END AS voto_2026
         FROM padron_rt t
-        JOIN personas p      ON t.dni = p.dni
-        JOIN elecciones e    ON e.tipo = 'rt' AND e.estado = 'activa'
-        LEFT JOIN dias_eleccion d ON d.id_eleccion = e.id
-        LEFT JOIN mesas m    ON m.id_dia = d.id
-        LEFT JOIN votos_dia v ON v.dni = p.dni AND v.id_mesa = m.id
+        JOIN personas p   ON t.dni = p.dni
+        JOIN elecciones e ON e.tipo = 'rt' AND e.estado = 'activa'
         WHERE $campo
 
         UNION ALL
 
-        SELECT e.nombre AS eleccion, p.dni, p.apellido, p.nombre,
-               CASE WHEN v.id IS NOT NULL THEN 'SI' ELSE 'NO' END AS voto_2026
+        SELECT
+            (SELECT nombre FROM elecciones
+             WHERE tipo = 'cs' AND estado = 'activa' LIMIT 1) AS eleccion,
+            p.dni, p.apellido, p.nombre,
+            CASE WHEN EXISTS (
+                SELECT 1 FROM votos_dia v
+                WHERE v.dni = p.dni AND v.id_mesa IN ($sub_mesas)
+            ) THEN 'SI' ELSE 'NO' END AS voto_2026
         FROM padron_cs t
-        JOIN personas p      ON t.dni = p.dni
-        JOIN elecciones e    ON e.tipo = 'cs' AND e.estado = 'activa'
-        LEFT JOIN dias_eleccion d ON d.id_eleccion = e.id
-        LEFT JOIN mesas m    ON m.id_dia = d.id
-        LEFT JOIN votos_dia v ON v.dni = p.dni AND v.id_mesa = m.id
+        JOIN personas p   ON t.dni = p.dni
+        JOIN elecciones e ON e.tipo = 'cs' AND e.estado = 'activa'
         WHERE $campo
 
         ORDER BY apellido, nombre, eleccion
     ";
 
-    // Cuatro parametros: uno por cada SELECT del UNION
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([$param, $param, $param, $param]);
+    $stmt->execute([
+        'cd', $param,
+        'cp', $param,
+        'rt', $param,
+        'cs', $param,
+    ]);
     return $stmt->fetchAll();
 }
 
 // obtener_eleccion()
-// Devuelve los datos de una eleccion activa por id.
+// Devuelve datos de una eleccion activa por id. NULL si no existe o no esta activa.
 function obtener_eleccion(PDO $pdo, int $id): ?array {
     $stmt = $pdo->prepare("
         SELECT id, nombre, tipo, anio
@@ -143,13 +170,12 @@ function obtener_eleccion(PDO $pdo, int $id): ?array {
 }
 
 // obtener_listado()
-// Consulta la vista correspondiente segun el tipo de eleccion.
+// Consulta la vista correspondiente al tipo de eleccion.
 // Aplica filtros opcionales de referente, partido y trabajo.
-// Devuelve solo las columnas relevantes para el tipo.
+// Devuelve solo las columnas relevantes segun el tipo.
 function obtener_listado(PDO $pdo, array $eleccion, array $filtros): array {
     $tipo = $eleccion['tipo'];
 
-    // Vista segun tipo de eleccion
     $vista = match($tipo) {
         'cd' => 'vista_fiscal_cd',
         'cp' => 'vista_fiscal_cp',
@@ -162,22 +188,17 @@ function obtener_listado(PDO $pdo, array $eleccion, array $filtros): array {
         return [];
     }
 
-    // Columnas a mostrar segun tipo
-    // CD: carrera en lugar de auxiliar
-    // CP/RT/CS: auxiliar, sin carrera
-    if ($tipo === 'cd') {
-        $columnas_select = "eleccion, dni, apellido, nombre, carrera, voto_2026";
-    } else {
-        $columnas_select = "eleccion, dni, apellido, nombre, auxiliar, voto_2026";
-    }
+    // CD muestra carrera. CP/RT/CS muestran auxiliar.
+    $columnas_select = $tipo === 'cd'
+        ? "eleccion, dni, apellido, nombre, carrera, voto_2026"
+        : "eleccion, dni, apellido, nombre, auxiliar, voto_2026";
 
-    // Construir WHERE dinamico para los filtros opcionales
-    // Los filtros usan columnas de la vista que no se muestran en pantalla
+    // WHERE dinamico — los filtros usan columnas de la vista
+    // que no se muestran en pantalla pero existen en la vista
     $where  = [];
     $params = [];
 
     if ($filtros['referente'] !== '') {
-        // Buscar en cualquiera de los tres referentes
         $where[]  = "(referente_1 = ? OR referente_2 = ? OR referente_3 = ?)";
         $params[] = $filtros['referente'];
         $params[] = $filtros['referente'];
@@ -210,7 +231,6 @@ function obtener_listado(PDO $pdo, array $eleccion, array $filtros): array {
 // CARGA DE DATOS PARA LA VISTA
 // ============================================================
 
-// Elecciones activas para el combo
 $elecciones_activas = $pdo->query("
     SELECT id, nombre, tipo, anio
     FROM elecciones
@@ -218,7 +238,6 @@ $elecciones_activas = $pdo->query("
     ORDER BY tipo ASC, anio ASC
 ")->fetchAll();
 
-// Eleccion seleccionada
 $id_eleccion_sel = intval($_GET['id_eleccion'] ?? 0);
 $eleccion_sel    = null;
 $listado         = [];
@@ -235,27 +254,20 @@ if ($id_eleccion_sel > 0) {
     }
 }
 
-// Combos de filtros — solo referentes, partidos y trabajos activos
 $referentes = $pdo->query("
     SELECT CONCAT(apellido, ' ', nombre) AS nombre_completo
-    FROM referentes
-    WHERE activo = 1
+    FROM referentes WHERE activo = 1
     ORDER BY apellido ASC, nombre ASC
 ")->fetchAll(PDO::FETCH_COLUMN);
 
 $partidos = $pdo->query("
-    SELECT nombre FROM partidos
-    WHERE activo = 1
-    ORDER BY nombre ASC
+    SELECT nombre FROM partidos WHERE activo = 1 ORDER BY nombre ASC
 ")->fetchAll(PDO::FETCH_COLUMN);
 
 $trabajos = $pdo->query("
-    SELECT nombre FROM trabajos
-    WHERE activo = 1
-    ORDER BY nombre ASC
+    SELECT nombre FROM trabajos WHERE activo = 1 ORDER BY nombre ASC
 ")->fetchAll(PDO::FETCH_COLUMN);
 
-// Buscador de persona
 $q_busqueda      = trim($_GET['q'] ?? '');
 $resultado_busca = [];
 if ($q_busqueda !== '') {
@@ -289,9 +301,7 @@ require_once 'includes/navbar.php';
     <?php if (!empty($resultado_busca)): ?>
     <div class="col-auto">
         <a href="index.php?mod=listados&export=buscador&q=<?php echo urlencode($q_busqueda); ?>"
-           class="btn btn-sm btn-outline-secondary">
-            Descargar Excel
-        </a>
+           class="btn btn-sm btn-outline-secondary">Descargar Excel</a>
     </div>
     <?php endif; ?>
 </form>
@@ -320,9 +330,9 @@ require_once 'includes/navbar.php';
             <?php foreach ($resultado_busca as $fila): ?>
             <tr>
                 <td><?php echo htmlspecialchars($fila['eleccion'], ENT_QUOTES, 'UTF-8'); ?></td>
-                <td><?php echo htmlspecialchars($fila['dni'], ENT_QUOTES, 'UTF-8'); ?></td>
+                <td><?php echo htmlspecialchars($fila['dni'],      ENT_QUOTES, 'UTF-8'); ?></td>
                 <td><?php echo htmlspecialchars($fila['apellido'], ENT_QUOTES, 'UTF-8'); ?></td>
-                <td><?php echo htmlspecialchars($fila['nombre'], ENT_QUOTES, 'UTF-8'); ?></td>
+                <td><?php echo htmlspecialchars($fila['nombre'],   ENT_QUOTES, 'UTF-8'); ?></td>
                 <td>
                     <?php if ($fila['voto_2026'] === 'SI'): ?>
                         <span class="badge bg-success">SI</span>
@@ -351,13 +361,10 @@ require_once 'includes/navbar.php';
     </p>
 <?php else: ?>
 
-<!-- Formulario de seleccion y filtros -->
 <form method="GET" action="index.php" class="mb-3">
     <input type="hidden" name="mod" value="listados">
-
     <div class="row g-2 align-items-end">
 
-        <!-- Combo de elecciones -->
         <div class="col-md-3">
             <label class="form-label form-label-sm">Elección</label>
             <select name="id_eleccion" class="form-select form-select-sm"
@@ -374,7 +381,6 @@ require_once 'includes/navbar.php';
 
         <?php if ($eleccion_sel): ?>
 
-        <!-- Filtro referente -->
         <div class="col-md-3">
             <label class="form-label form-label-sm">Referente</label>
             <select name="referente" class="form-select form-select-sm">
@@ -388,8 +394,7 @@ require_once 'includes/navbar.php';
             </select>
         </div>
 
-        <!-- Filtro partido -->
-        <div class="col-md-3">
+        <div class="col-md-2">
             <label class="form-label form-label-sm">Partido</label>
             <select name="partido" class="form-select form-select-sm">
                 <option value="">Todos</option>
@@ -402,8 +407,7 @@ require_once 'includes/navbar.php';
             </select>
         </div>
 
-        <!-- Filtro trabajo -->
-        <div class="col-md-3">
+        <div class="col-md-2">
             <label class="form-label form-label-sm">Trabajo</label>
             <select name="trabajo" class="form-select form-select-sm">
                 <option value="">Todos</option>
@@ -416,22 +420,16 @@ require_once 'includes/navbar.php';
             </select>
         </div>
 
-        <!-- Botones -->
         <div class="col-auto">
             <button type="submit" class="btn btn-sm btn-primary">Filtrar</button>
         </div>
         <div class="col-auto">
             <a href="index.php?mod=listados&id_eleccion=<?php echo $id_eleccion_sel; ?>"
-               class="btn btn-sm btn-outline-secondary">
-                Limpiar
-            </a>
+               class="btn btn-sm btn-outline-secondary">Limpiar</a>
         </div>
         <div class="col-auto">
-            <!-- Descarga Excel con los mismos filtros activos -->
             <a href="index.php?mod=listados&export=listado&id_eleccion=<?php echo $id_eleccion_sel; ?>&referente=<?php echo urlencode($filtros['referente']); ?>&partido=<?php echo urlencode($filtros['partido']); ?>&trabajo=<?php echo urlencode($filtros['trabajo']); ?>"
-               class="btn btn-sm btn-outline-secondary">
-                Descargar Excel
-            </a>
+               class="btn btn-sm btn-outline-secondary">Descargar Excel</a>
         </div>
 
         <?php endif; ?>
@@ -439,15 +437,12 @@ require_once 'includes/navbar.php';
     </div>
 </form>
 
-<!-- Resultado del listado -->
 <?php if ($eleccion_sel && !empty($listado)): ?>
 
 <div class="text-secondary mb-2" style="font-size:0.82rem;">
     <?php echo number_format(count($listado), 0, ',', '.'); ?> registros
     — <?php echo htmlspecialchars($eleccion_sel['nombre'], ENT_QUOTES, 'UTF-8'); ?>
-    <?php if (array_filter($filtros)): ?>
-        — con filtros aplicados
-    <?php endif; ?>
+    <?php if (array_filter($filtros)): ?>— con filtros aplicados<?php endif; ?>
 </div>
 
 <div class="table-responsive">
@@ -469,12 +464,12 @@ require_once 'includes/navbar.php';
         <tbody>
             <?php foreach ($listado as $fila): ?>
             <tr>
-                <td><?php echo htmlspecialchars($fila['eleccion'],  ENT_QUOTES, 'UTF-8'); ?></td>
-                <td><?php echo htmlspecialchars($fila['dni'],       ENT_QUOTES, 'UTF-8'); ?></td>
-                <td><?php echo htmlspecialchars($fila['apellido'],  ENT_QUOTES, 'UTF-8'); ?></td>
-                <td><?php echo htmlspecialchars($fila['nombre'],    ENT_QUOTES, 'UTF-8'); ?></td>
+                <td><?php echo htmlspecialchars($fila['eleccion'], ENT_QUOTES, 'UTF-8'); ?></td>
+                <td><?php echo htmlspecialchars($fila['dni'],      ENT_QUOTES, 'UTF-8'); ?></td>
+                <td><?php echo htmlspecialchars($fila['apellido'], ENT_QUOTES, 'UTF-8'); ?></td>
+                <td><?php echo htmlspecialchars($fila['nombre'],   ENT_QUOTES, 'UTF-8'); ?></td>
                 <?php if ($eleccion_sel['tipo'] === 'cd'): ?>
-                <td><?php echo htmlspecialchars($fila['carrera'],   ENT_QUOTES, 'UTF-8'); ?></td>
+                <td><?php echo htmlspecialchars($fila['carrera'],  ENT_QUOTES, 'UTF-8'); ?></td>
                 <?php else: ?>
                 <td>
                     <?php if ($fila['auxiliar'] === 'SI'): ?>
@@ -503,6 +498,6 @@ require_once 'includes/navbar.php';
     </p>
 <?php endif; ?>
 
-<?php endif; // fin if elecciones_activas ?>
+<?php endif; ?>
 
 <?php require_once 'includes/footer.php'; ?>
