@@ -20,6 +20,7 @@ $modulos = [
     'dashboard'         => 'modulos/dashboard/dashboard.php',
     'listados'          => 'modulos/listados/listados.php',
     'observados'        => 'modulos/observados/observados.php',
+    'punteo'            => 'modulos/punteo/punteo.php',
     'abm_elecciones'    => 'modulos/abm_elecciones/abm_elecciones.php',
     'abm_usuarios'      => 'modulos/abm_usuarios/abm_usuarios.php',
 ];

@@ -1,19 +1,21 @@
-# Log de migración de datos
+# Log de migracion de datos
 
-**Proyecto:** Fiscalizar  
-**Actualizado:** Mayo 2026  
+**Proyecto:** Fiscalizar
+**Actualizado:** Junio 2026
 
 ---
 
 ## Contexto general
 
-Se realizaron tres procesos de migracion y actualizacion sucesivos.
+Se realizaron tres procesos de migracion y actualizacion sucesivos, mas un proceso
+de cambios estructurales para el modulo Fiscalizacion.
 
 | Proceso | Fecha | Descripcion |
 |---|---|---|
 | Migracion inicial | Febrero 2026 | Consolidacion desde bases anteriores. Descartada por inconsistencias. |
 | Segunda migracion | Marzo 2026 | Desde tablas staging consolidadas offline. Base actual. |
 | Actualizacion padrones y vinculos | Mayo 2026 | Padrones 2026, nuevas tablas, catalogos ampliados, vinculos actualizados. |
+| Cambios estructurales Fiscalizacion | Junio 2026 | Nuevas tablas y vistas para el modulo electoral. |
 
 Ninguna de las bases de origen fue modificada. Quedan en modo solo lectura.
 
@@ -26,7 +28,7 @@ Ninguna de las bases de origen fue modificada. Quedan en modo solo lectura.
 
 ## Segunda migracion — Marzo 2026
 
-### Cambios de diseño incorporados
+### Cambios de diseno incorporados
 
 | Cambio | Detalle |
 |---|---|
@@ -78,11 +80,15 @@ Ninguna de las bases de origen fue modificada. Quedan en modo solo lectura.
 
 ### Baja de referentes
 
-Se dieron de baja 25 referentes (activo = 0). Se ejecuto compactacion en `referentes_graduado`: las posiciones vacias se corrieron hacia la izquierda. Las posiciones sin referente se asignaron al id 250 (SIN REFERENTE) en lugar de NULL. Se insertaron filas con id 250 en las tres posiciones para personas que no tenian fila.
+Se dieron de baja 25 referentes (activo = 0). Se ejecuto compactacion en referentes_graduado.
+Las posiciones vacias se corrieron hacia la izquierda. Las posiciones sin referente se
+asignaron al id 250 (SIN REFERENTE). Se insertaron filas con id 250 en las tres posiciones
+para personas sin fila.
 
 ### Recreacion de vistas
 
-Las vistas `vista_padron_cd` y `vista_padron_cp` fueron recreadas con JOIN a `persona_sede`, `sedes`, `persona_municipio` y `municipios`, reemplazando el campo `sede_laboral` texto libre. Se agrego `AND r.activo = 1` en los tres JOIN a `referentes`.
+Las vistas vista_padron_cd y vista_padron_cp fueron recreadas con JOIN a persona_sede,
+sedes, persona_municipio y municipios. Se agrego AND r.activo = 1 en los tres JOIN a referentes.
 
 ### Nuevas tablas
 
@@ -111,99 +117,17 @@ Las vistas `vista_padron_cd` y `vista_padron_cp` fueron recreadas con JOIN a `pe
 | `st_padron_cp_2026` | 4.843 | Padron CP 2026 oficial |
 | `st_padron_rt_2026` | 5.240 | Padron RT 2026 oficial |
 | `st_padron_cs_2026` | 4.829 | Padron CS 2026 oficial |
-| `st_padron_profesores_cp_2026` | — | Padron de profesores CP para cruce de bajas |
-| `st_actualizacion_referentes_2026` | 193 | Referentes y partidos nuevos por DNI |
+| `st_padron_profesores_cp_2026` | — | Para cruce de bajas |
+| `st_actualizacion_referentes_2026` | 193 | Referentes y partidos nuevos |
 | `st_bajas_padron_cd_2026` | 111 | DNIs que salen del padron CD |
 | `st_bajas_padron_cp_2026` | 100 | DNIs que salen del padron CP |
-| `st_padron_cd_2024` | 19.521 | Backup padron CD pre-actualizacion |
-| `st_padron_cp_2024` | 4.554 | Backup padron CP pre-actualizacion |
-| `st_padron_cp_pre_auxiliares_2026` | 4.843 | Backup padron CP pre-marcado auxiliares |
-| `st_persona_partido_pre_actualizacion_2026` | 1.371 | Backup persona_partido pre-actualizacion |
-
-### Depuracion de staging CD 2026
-
-Se encontraron 5 DNIs duplicados en `st_padron_cd_2026`. Se eliminaron las filas de menor prioridad:
-
-| Caso | DNI | Resolucion |
-|---|---|---|
-| Nombre abreviado | 33190278 | Se mantuvo el de menor orden |
-| Nombre abreviado | 38684141 | Se mantuvo el de menor orden |
-| Apellido con error | 41672123 | Se mantuvo VILLAPLANA (orden 21092) |
-| DNI invalido | 94200094 | Eliminados ambos registros |
-| DNI invalido | 95856298 | Eliminados ambos registros |
-
-### Cruce de auxiliares en staging
-
-| Padron | Auxiliares identificados |
-|---|---|
-| CP | 175 |
-| RT | 118 |
-| CS | 161 |
-| **Total** | **454** |
-
-Se identificaron 4 DNIs auxiliares en mas de una carrera simultaneamente.
-
-### Orden de ejecucion
-
-1. Insertar 2.616 personas nuevas en `personas`
-2. Backup `padron_cd` → `st_padron_cd_2024`
-3. TRUNCATE + repoblar `padron_cd` desde `st_padron_cd_2026` (21.745 filas)
-4. Backup `padron_cp` → `st_padron_cp_2024`
-5. TRUNCATE + repoblar `padron_cp` desde `st_padron_cp_2026` (4.843 filas)
-6. UPDATE `padron_cp` SET auxiliar=1 donde DNI no esta en `padron_cd` (175 filas)
-7. INSERT `auxiliares` desde CP (175), RT (118), CS (161)
-8. INSERT `padron_rt` desde `st_padron_rt_2026` (5.240 filas)
-9. INSERT `padron_cs` desde `st_padron_cs_2026` (4.829 filas)
-10. Extender ENUM `elecciones.tipo` a cd/cp/rt/cs
-11. INSERT elecciones RT 2026 (id=7) y CS 2026 (id=8)
-
-### Actualizacion de referentes y partidos
-
-Se cargo `st_actualizacion_referentes_2026` con 193 registros (dni, id_referente, id_partido).
-
-**Referentes:**
-- 18 DNIs actualizados con desplazamiento (ref nuevo → ref1, anterior → ref2)
-- 166 DNIs sin fila previa: INSERT con referente_1 = nuevo
-- 7 saltados (referente ya presente en alguna posicion)
-- 2 saltados por DNI no encontrado en `personas`
-
-**Partidos:**
-- 2 DNIs actualizados (partido distinto al existente)
-- 189 DNIs insertados (no tenian partido previo)
-- 11 saltados (mismo partido ya asignado)
-
-**Problema encontrado:** el primer INSERT de partidos inserto filas duplicadas por error de logica en la query. Se trunco `persona_partido`, se reconstruyo desde `st_padron_cd_datos` (1.371 filas) y se reaplico el listado correctamente. El partido NUEVO ENCUENTRO no matcheo por cambio de nombre a EX NUEVO ENCUENTRO — se insertaron los 4 DNIs afectados manualmente.
-
-### Actualizacion de vistas
-
-Las vistas `vista_padron_cd` y `vista_padron_cp` fueron recreadas con:
-- COALESCE en todos los campos opcionales: devuelven texto explicito (SIN REFERENTE, SIN PARTIDO, SIN TRABAJO, SIN SEDE, SIN MUNICIPIO) en lugar de NULL.
-- Campo `auxiliar` en `vista_padron_cp` devuelve SI/NO como texto en lugar de 1/0.
+| `st_padron_cd_2024` | 19.521 | Backup pre-actualizacion |
+| `st_padron_cp_2024` | 4.554 | Backup pre-actualizacion |
 
 ### Reconstruccion del campo sigla en padron_cd
 
-El padron CD 2026 no incluye la sigla de carrera. Se reconstruyo cruzando contra los cinco padrones de carrera via la tabla staging `st_dni_carrera`.
-
-**Tablas staging adicionales cargadas:**
-
-| Tabla | Registros |
-|---|---|
-| `st_padron_ts_2026` | 2.936 |
-| `st_padron_cc_2026` | 4.504 |
-| `st_dni_carrera` | 22.103 |
-
-TS y CC quedan solo en staging — no tienen tabla productiva.
-
-**Proceso:**
-
-1. Se pobló `st_dni_carrera` uniendo los cinco padrones de carrera con prioridad CP > CS > RT > TS > CC. Un DNI con múltiples carreras toma la de mayor prioridad.
-2. UPDATE `padron_cd` desde `st_dni_carrera` por DNI → 21.394 filas resueltas.
-3. Los 351 sin match se buscaron en `st_padron_cd_2024` → 335 filas resueltas.
-4. Tres casos con DNI erróneo identificados por apellido y nombre → corregidos manualmente (FERRARIO EMILIA CP, MARTINEZ CLARISA LORENA TS, PALUMBO NANCY EMILSE CC).
-5. Se agregó id=98 (NS, No identificada) al catalogo `carreras`.
-6. Los 13 DNIs restantes se marcaron con sigla NS.
-
-**Resultado:**
+El padron CD 2026 no incluye la sigla de carrera. Se reconstruyo cruzando contra
+los cinco padrones de carrera via st_dni_carrera.
 
 | Fuente | DNIs resueltos |
 |---|---|
@@ -213,7 +137,9 @@ TS y CC quedan solo en staging — no tienen tabla productiva.
 | NS (no identificados) | 13 |
 | **Total** | **21.745** |
 
----
+Se agrego id=98 (NS, No identificada) al catalogo carreras.
+
+### Resultados finales
 
 | Tabla | Registros | Estado |
 |---|---|---|
@@ -226,20 +152,87 @@ TS y CC quedan solo en staging — no tienen tabla productiva.
 | `elecciones` | 8 | ✅ |
 | `referentes_graduado` | 22.325 | ✅ |
 | `persona_partido` | 1.560 | ✅ |
-| `mesas` | — | ✅ Creada mayo 2026 |
-| `usuarios_fiscal` | — | ✅ Creada mayo 2026 |
-| `votos_dia` | — | ✅ Creada mayo 2026 |
 
 ---
 
-## Creacion de tablas de Fiscalizacion — Mayo 2026
+## Cambios estructurales para Fiscalizacion — Junio 2026
 
-Las tablas `mesas`, `usuarios_fiscal` y `votos_dia` fueron creadas en la base productiva `fiscaliz_padron`. Las vistas `vista_padron_rt` y `vista_padron_cs` fueron creadas. El usuario superadmin fue dado de alta en `usuarios_fiscal`. El modulo Fiscalizacion queda listo para iniciar desarrollo.
+Script aplicado: fiscaliz_estructura_v2.sql
 
-Ver [fiscalizacion/README.md](../fiscalizacion/README.md) para el estado actual del modulo.
+### Cambios en tabla elecciones
+
+El campo `activa TINYINT(1)` fue reemplazado por `estado ENUM('programada','activa','cerrada')`.
+
+- Elecciones 1-6 (historicas): estado = 'cerrada'
+- Elecciones 7-8 (RT 2026, CS 2026): estado = 'programada'
+
+Razon: el campo booleano no distinguia entre una eleccion futura (programada)
+y una eleccion historica terminada (cerrada). El ENUM expresa el ciclo de vida completo.
+
+### Nuevas tablas
+
+**`dias_eleccion`** — nivel intermedio entre elecciones y mesas.
+La habilitacion opera a nivel dia, no a nivel mesa individual.
+
+**`mesas`** (modificada) — se agrego id_dia como FK a dias_eleccion.
+Se elimino id_eleccion (columna redundante — la eleccion se obtiene via id_dia).
+El campo habilitada quedo deprecado — la habilitacion viene de dias_eleccion.habilitado.
+
+**`votos_dia`** — registro en tiempo real de votos del dia.
+Se elimino id_eleccion (la eleccion se obtiene via id_mesa -> dias_eleccion -> elecciones).
+Se elimino el UNIQUE KEY (dni, id_eleccion) y se creo (dni, id_mesa).
+Se eliminaron los indices asociados a id_eleccion.
+
+**`usuarios_fiscal`** — usuarios admin y superadmin del modulo Fiscalizacion.
+Independiente de la tabla usuarios de Consulta Padron.
+
+**`punteo`** — punteo de nuestra lista por corte y por mesa.
+UNIQUE KEY (id_mesa, numero_corte).
+El numero_corte se asigna automaticamente (MAX + 1 por mesa).
+
+### Nuevas vistas
+
+Cuatro vistas creadas para el modulo Fiscalizacion. No reemplazan ni modifican
+las vistas de Consulta Padron.
+
+- vista_fiscal_cd — fuente padron_cd — VOTO_2026 desde votos_dia — incluye CARRERA
+- vista_fiscal_cp — fuente padron_cp — VOTO_2026 desde votos_dia — incluye AUXILIAR
+- vista_fiscal_rt — fuente padron_rt — VOTO_2026 desde votos_dia — AUXILIAR desde auxiliares id_carrera=3
+- vista_fiscal_cs — fuente padron_cs — VOTO_2026 desde votos_dia — AUXILIAR desde auxiliares id_carrera=1
+
+Todas usan EXISTS + subquery sobre mesas de la eleccion activa del tipo correspondiente
+para evitar duplicados cuando una eleccion tiene mas de un dia.
+
+### Problemas encontrados y resolucion
+
+- **Campo id_eleccion en mesas**: tenia FK fk_mesas_elecciones que requirio DROP FOREIGN KEY antes del DROP COLUMN.
+- **Campo id_eleccion en votos_dia**: tenia UNIQUE KEY uk_voto_dni_eleccion e indice idx_id_eleccion que requirieron eliminarse antes del DROP COLUMN.
+- **Mesas de prueba**: las 8 mesas cargadas manualmente quedaron con id_dia = NULL. Se eliminaron con reset_total.sql y se recrean desde la interfaz.
+
+### Verificacion de integridad
+
+Se verifico que todos los DNIs de padron_rt y padron_cs existen en personas:
+
+```sql
+SELECT COUNT(*) FROM padron_rt prt
+LEFT JOIN personas p ON prt.dni = p.dni WHERE p.dni IS NULL;
+-- Resultado: 0
+
+SELECT COUNT(*) FROM padron_cs pcs
+LEFT JOIN personas p ON pcs.dni = p.dni WHERE p.dni IS NULL;
+-- Resultado: 0
+```
+
+Se verifico la consistencia de votos 2024 en las vistas de Consulta Padron:
+
+- CD: 3.805 votos en participacion_electoral, 3.749 en vista (56 dados de baja en 2026 — todos confirmados en st_bajas_padron_cd_2026).
+- CP: 1.394 votos en participacion_electoral, 1.359 en vista (35 dados de baja en 2026 — todos confirmados en st_bajas_padron_cp_2026).
+- Diferencias esperadas y correctas.
 
 ---
 
-## Estado final de la base — Mayo 2026
+## Pendientes antes del pase a produccion real
 
-Todos los pendientes de migracion estan cerrados. La base `fiscaliz_padron` esta completa y en produccion.
+- Prueba completa del flujo electoral con datos reales (activar eleccion, habilitar dias, loguear fiscales, registrar votos, cerrar y migrar).
+- Crear vistas vista_padron_rt y vista_padron_cs para futura version de Consulta Padron.
+- Evaluar incorporacion de votos RT y CS en vistas de Consulta Padron (version 2).
