@@ -9,11 +9,12 @@
 //   Input unico (apellido o DNI). Busca en todos los padrones de elecciones activas.
 //   Resultado: ELECCION | DNI | APELLIDO | NOMBRE | VOTO 2026
 //   Una fila por padron donde figura la persona. Sin duplicados.
-//   Descargable en Excel.
+//   Descargable en Excel. Boton limpiar busqueda.
 //
 // Seccion 2 — Listado por eleccion
-//   Combo: elegir una eleccion activa.
-//   Filtros opcionales: referente, partido, trabajo.
+//   DOS formularios separados para evitar que id_eleccion se pierda al filtrar:
+//     Form 1: solo el combo de eleccion (onchange submit)
+//     Form 2: hidden id_eleccion + filtros + botones
 //   Para CD: ELECCION | DNI | APELLIDO | NOMBRE | CARRERA | VOTO 2026
 //   Para CP/RT/CS: ELECCION | DNI | APELLIDO | NOMBRE | AUXILIAR | VOTO 2026
 //   Descargable en Excel.
@@ -63,18 +64,13 @@ if ($export === 'listado') {
 // buscar_en_padrones()
 // Busca en todos los padrones de elecciones activas por apellido o DNI.
 // Devuelve UNA fila por padron donde figura la persona — sin duplicados.
-//
-// El voto se verifica con EXISTS + subquery sobre las mesas de la eleccion
-// activa del tipo correspondiente. Esto evita el producto cartesiano que
-// causaba duplicados cuando una eleccion tenia mas de un dia creado
-// (el LEFT JOIN a dias_eleccion x mesas multiplicaba las filas).
+// Usa EXISTS + subquery para verificar el voto, evitando el producto
+// cartesiano que causaba duplicados con LEFT JOIN a dias_eleccion x mesas.
 function buscar_en_padrones(PDO $pdo, string $q): array {
     $es_dni = ctype_digit($q);
     $param  = $es_dni ? $q : $q . '%';
     $campo  = $es_dni ? 't.dni = ?' : 'p.apellido LIKE ?';
 
-    // Subquery que devuelve los ids de mesas de la eleccion activa de un tipo.
-    // Se embebe en cada rama del UNION con el tipo como parametro posicional.
     $sub_mesas = "
         SELECT m.id FROM mesas m
         JOIN dias_eleccion d ON m.id_dia = d.id
@@ -82,8 +78,6 @@ function buscar_en_padrones(PDO $pdo, string $q): array {
         WHERE ex.tipo = ? AND ex.estado = 'activa'
     ";
 
-    // Cuatro ramas UNION ALL, una por tipo de padron.
-    // Parametros por rama: tipo (para sub_mesas) + param (para WHERE busqueda).
     $sql = "
         SELECT
             (SELECT nombre FROM elecciones
@@ -194,7 +188,6 @@ function obtener_listado(PDO $pdo, array $eleccion, array $filtros): array {
         : "eleccion, dni, apellido, nombre, auxiliar, voto_2026";
 
     // WHERE dinamico — los filtros usan columnas de la vista
-    // que no se muestran en pantalla pero existen en la vista
     $where  = [];
     $params = [];
 
@@ -237,6 +230,12 @@ $elecciones_activas = $pdo->query("
     WHERE estado = 'activa'
     ORDER BY tipo ASC, anio ASC
 ")->fetchAll();
+
+// Castear id a int para que la comparacion con intval() funcione correctamente
+foreach ($elecciones_activas as &$e) {
+    $e['id'] = intval($e['id']);
+}
+unset($e);
 
 $id_eleccion_sel = intval($_GET['id_eleccion'] ?? 0);
 $eleccion_sel    = null;
@@ -288,6 +287,7 @@ require_once 'includes/navbar.php';
     Buscá por apellido o DNI en todos los padrones de elecciones activas.
 </p>
 
+<!-- Form 1: busqueda -->
 <form method="GET" action="index.php" class="row g-2 align-items-end mb-3">
     <input type="hidden" name="mod" value="listados">
     <div class="col-md-4">
@@ -298,10 +298,20 @@ require_once 'includes/navbar.php';
     <div class="col-auto">
         <button type="submit" class="btn btn-sm btn-primary">Buscar</button>
     </div>
+    <?php if ($q_busqueda !== ''): ?>
+    <div class="col-auto">
+        <!-- Limpiar: vuelve a listados sin parametro q -->
+        <a href="index.php?mod=listados" class="btn btn-sm btn-outline-secondary">
+            Limpiar búsqueda
+        </a>
+    </div>
+    <?php endif; ?>
     <?php if (!empty($resultado_busca)): ?>
     <div class="col-auto">
         <a href="index.php?mod=listados&export=buscador&q=<?php echo urlencode($q_busqueda); ?>"
-           class="btn btn-sm btn-outline-secondary">Descargar Excel</a>
+           class="btn btn-sm btn-outline-secondary">
+            Descargar Excel
+        </a>
     </div>
     <?php endif; ?>
 </form>
@@ -361,11 +371,13 @@ require_once 'includes/navbar.php';
     </p>
 <?php else: ?>
 
+<!-- Form 1 de esta seccion: solo el combo de eleccion -->
+<!-- Al cambiar la eleccion hace submit y recarga la pagina con id_eleccion en GET -->
+<!-- Los filtros viven en un form separado para que id_eleccion no se pierda -->
 <form method="GET" action="index.php" class="mb-3">
     <input type="hidden" name="mod" value="listados">
     <div class="row g-2 align-items-end">
-
-        <div class="col-md-3">
+        <div class="col-md-4">
             <label class="form-label form-label-sm">Elección</label>
             <select name="id_eleccion" class="form-select form-select-sm"
                     onchange="this.form.submit()">
@@ -378,8 +390,18 @@ require_once 'includes/navbar.php';
                 <?php endforeach; ?>
             </select>
         </div>
+    </div>
+</form>
 
-        <?php if ($eleccion_sel): ?>
+<?php if ($eleccion_sel): ?>
+
+<!-- Form 2 de esta seccion: filtros -->
+<!-- id_eleccion viaja como hidden input para que no se pierda al filtrar -->
+<form method="GET" action="index.php" class="mb-3">
+    <input type="hidden" name="mod" value="listados">
+    <input type="hidden" name="id_eleccion" value="<?php echo $id_eleccion_sel; ?>">
+
+    <div class="row g-2 align-items-end">
 
         <div class="col-md-3">
             <label class="form-label form-label-sm">Referente</label>
@@ -423,21 +445,24 @@ require_once 'includes/navbar.php';
         <div class="col-auto">
             <button type="submit" class="btn btn-sm btn-primary">Filtrar</button>
         </div>
+
+        <!-- Limpiar filtros: mantiene la eleccion seleccionada, borra los filtros -->
         <div class="col-auto">
             <a href="index.php?mod=listados&id_eleccion=<?php echo $id_eleccion_sel; ?>"
-               class="btn btn-sm btn-outline-secondary">Limpiar</a>
+               class="btn btn-sm btn-outline-secondary">Limpiar filtros</a>
         </div>
+
+        <!-- Descarga Excel con los mismos filtros activos -->
         <div class="col-auto">
             <a href="index.php?mod=listados&export=listado&id_eleccion=<?php echo $id_eleccion_sel; ?>&referente=<?php echo urlencode($filtros['referente']); ?>&partido=<?php echo urlencode($filtros['partido']); ?>&trabajo=<?php echo urlencode($filtros['trabajo']); ?>"
                class="btn btn-sm btn-outline-secondary">Descargar Excel</a>
         </div>
 
-        <?php endif; ?>
-
     </div>
 </form>
 
-<?php if ($eleccion_sel && !empty($listado)): ?>
+<!-- Resultado del listado -->
+<?php if (!empty($listado)): ?>
 
 <div class="text-secondary mb-2" style="font-size:0.82rem;">
     <?php echo number_format(count($listado), 0, ',', '.'); ?> registros
@@ -492,12 +517,13 @@ require_once 'includes/navbar.php';
     </table>
 </div>
 
-<?php elseif ($eleccion_sel && empty($listado)): ?>
+<?php else: ?>
     <p class="text-secondary" style="font-size:0.85rem;">
         No hay registros para los filtros seleccionados.
     </p>
 <?php endif; ?>
 
-<?php endif; ?>
+<?php endif; // fin if eleccion_sel ?>
+<?php endif; // fin if elecciones_activas ?>
 
 <?php require_once 'includes/footer.php'; ?>
