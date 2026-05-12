@@ -1,5 +1,5 @@
 -- reset_dia.sql
--- Limpia los votos del dia y libera todas las mesas.
+-- Limpia los votos del dia, el punteo y libera todas las mesas.
 -- Ejecutar antes de cada sesion de prueba del dia de la eleccion.
 -- Ejecutar en phpMyAdmin directamente. No exponer en el front.
 -- NO toca mesas, dias_eleccion, elecciones, usuarios_fiscal
@@ -8,6 +8,7 @@
 SET FOREIGN_KEY_CHECKS = 0;
 
 TRUNCATE TABLE votos_dia;
+TRUNCATE TABLE punteo;
 UPDATE mesas SET en_uso = 0;
 
 SET FOREIGN_KEY_CHECKS = 1;

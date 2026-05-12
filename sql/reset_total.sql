@@ -8,22 +8,25 @@
 
 SET FOREIGN_KEY_CHECKS = 0;
 
--- 1. Votos del dia (sin hijos, va primero)
+-- 1. Punteo (sin hijos, va primero)
+TRUNCATE TABLE punteo;
+
+-- 2. Votos del dia (sin hijos)
 TRUNCATE TABLE votos_dia;
 
--- 2. Mesas (depende de dias_eleccion, va antes que dias)
+-- 3. Mesas (depende de dias_eleccion)
 DELETE FROM mesas;
 ALTER TABLE mesas AUTO_INCREMENT = 1;
 
--- 3. Dias (depende de elecciones, va antes que elecciones se toque)
+-- 4. Dias (depende de elecciones)
 DELETE FROM dias_eleccion;
 ALTER TABLE dias_eleccion AUTO_INCREMENT = 1;
 
--- 4. Usuarios fiscales (independiente)
+-- 5. Usuarios fiscales (independiente)
 DELETE FROM usuarios_fiscal;
 ALTER TABLE usuarios_fiscal AUTO_INCREMENT = 1;
 
--- 5. Elecciones: vuelven todas a estado programada
+-- 6. Elecciones: vuelven todas a estado programada
 -- No se borran — son el historial real del sistema.
 -- Solo se resetea el estado para poder activarlas con datos reales.
 UPDATE elecciones SET estado = 'programada';
