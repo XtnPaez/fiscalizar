@@ -4,6 +4,11 @@
 // Recibe: q (texto buscado), modo (sugerencias | buscar)
 // Devuelve: JSON con array de resultados
 // Acceso: solo fiscales autenticados con sesion activa.
+//
+// Cambios respecto a la version anterior:
+//   - votos_dia no tiene id_eleccion. Para saber si una persona ya voto,
+//     se cruza por id_mesa usando las mesas de la eleccion activa del tipo
+//     correspondiente, obtenidas via dias_eleccion -> elecciones.
 
 session_start();
 require_once '../../config/db.php';
@@ -18,10 +23,9 @@ if (!isset($_SESSION['rol']) || $_SESSION['rol'] !== 'fiscal') {
 
 header('Content-Type: application/json');
 
-$q     = trim($_GET['q']    ?? '');
-$modo  = trim($_GET['modo'] ?? 'sugerencias');
-$tipo  = $_SESSION['tipo_mesa'];
-$id_eleccion = $_SESSION['id_eleccion'];
+$q    = trim($_GET['q']    ?? '');
+$modo = trim($_GET['modo'] ?? 'sugerencias');
+$tipo = $_SESSION['tipo_mesa'];
 
 if (strlen($q) < 2) {
     echo json_encode([]);
@@ -45,6 +49,16 @@ if (!$tabla) {
 // Limite segun modo
 $limite = $modo === 'sugerencias' ? 3 : 50;
 
+// Para saber si ya voto: buscamos en votos_dia cruzando por las mesas
+// de la eleccion activa del tipo correspondiente.
+// Usamos parametros posicionales (?) para el UNION implicito en el subquery.
+$subquery_mesas = "
+    SELECT m.id FROM mesas m
+    JOIN dias_eleccion d ON m.id_dia = d.id
+    JOIN elecciones e    ON d.id_eleccion = e.id
+    WHERE e.tipo = ? AND e.estado = 'activa'
+";
+
 // Detectar si es busqueda por DNI (solo numeros) o por apellido
 if (ctype_digit($q)) {
     // Busqueda por DNI
@@ -53,12 +67,13 @@ if (ctype_digit($q)) {
             CASE WHEN v.id IS NOT NULL THEN 1 ELSE 0 END AS ya_voto
         FROM $tabla t
         JOIN personas p ON t.dni = p.dni
-        LEFT JOIN votos_dia v ON p.dni = v.dni AND v.id_eleccion = ?
+        LEFT JOIN votos_dia v ON p.dni = v.dni
+            AND v.id_mesa IN ($subquery_mesas)
         WHERE t.dni LIKE ?
         ORDER BY p.apellido, p.nombre
         LIMIT $limite
     ");
-    $stmt->execute([$id_eleccion, $q . '%']);
+    $stmt->execute([$tipo, $q . '%']);
 } else {
     // Busqueda por apellido
     $stmt = $pdo->prepare("
@@ -66,12 +81,13 @@ if (ctype_digit($q)) {
             CASE WHEN v.id IS NOT NULL THEN 1 ELSE 0 END AS ya_voto
         FROM $tabla t
         JOIN personas p ON t.dni = p.dni
-        LEFT JOIN votos_dia v ON p.dni = v.dni AND v.id_eleccion = ?
+        LEFT JOIN votos_dia v ON p.dni = v.dni
+            AND v.id_mesa IN ($subquery_mesas)
         WHERE p.apellido LIKE ?
         ORDER BY p.apellido, p.nombre
         LIMIT $limite
     ");
-    $stmt->execute([$id_eleccion, $q . '%']);
+    $stmt->execute([$tipo, $q . '%']);
 }
 
 $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);

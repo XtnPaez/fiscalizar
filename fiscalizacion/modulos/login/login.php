@@ -5,6 +5,12 @@
 //   Superior — Fiscales: combo de mesas + password
 //   Inferior — Admin y Superadmin: usuario + password
 // Acceso: publico.
+//
+// Cambios respecto a la version anterior:
+//   - La query de mesas ya no usa m.id_eleccion (columna eliminada).
+//   - La habilitacion de mesas viene de dias_eleccion.habilitado (no mesas.habilitada).
+//   - El combo muestra mesas cuyo dia esta habilitado y cuya eleccion esta activa.
+//   - La sesion del fiscal incluye id_eleccion obtenido via dias_eleccion.
 
 // Si ya hay sesion activa redirigir segun rol
 if (isset($_SESSION['rol'])) {
@@ -27,11 +33,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_fiscal'])) {
 
     if ($id_mesa > 0 && $password !== '') {
 
-        // Buscar la mesa — debe estar habilitada y no en uso
+        // Buscar la mesa con su dia y eleccion
+        // La mesa debe pertenecer a un dia habilitado de una eleccion activa
+        // y no estar en uso
         $stmt = $pdo->prepare("
-            SELECT id, nombre, tipo, id_eleccion, password, activa
-            FROM mesas
-            WHERE id = ? AND habilitada = 1 AND en_uso = 0
+            SELECT m.id, m.nombre, m.tipo, m.password, m.activa,
+                   d.id AS id_dia,
+                   e.id AS id_eleccion
+            FROM mesas m
+            JOIN dias_eleccion d ON m.id_dia = d.id
+            JOIN elecciones e    ON d.id_eleccion = e.id
+            WHERE m.id = ?
+              AND d.habilitado = 1
+              AND e.estado = 'activa'
+              AND m.en_uso = 0
         ");
         $stmt->execute([$id_mesa]);
         $mesa = $stmt->fetch();
@@ -102,12 +117,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_admin'])) {
 }
 
 // --- Cargar mesas disponibles para el combo ---
-// Solo mesas habilitadas y no en uso
+// Solo mesas de dias habilitados de elecciones activas, no en uso
 $stmt_mesas = $pdo->query("
     SELECT m.id, m.nombre, m.tipo, e.nombre AS eleccion
     FROM mesas m
-    JOIN elecciones e ON m.id_eleccion = e.id
-    WHERE m.habilitada = 1 AND m.en_uso = 0
+    JOIN dias_eleccion d ON m.id_dia = d.id
+    JOIN elecciones e    ON d.id_eleccion = e.id
+    WHERE d.habilitado = 1
+      AND e.estado = 'activa'
+      AND m.en_uso = 0
     ORDER BY m.tipo, m.nombre
 ");
 $mesas_disponibles = $stmt_mesas->fetchAll();
@@ -203,6 +221,7 @@ $mesas_disponibles = $stmt_mesas->fetchAll();
                                 <?php foreach ($mesas_disponibles as $m): ?>
                                     <option value="<?php echo $m['id']; ?>">
                                         <?php echo htmlspecialchars($m['nombre'], ENT_QUOTES, 'UTF-8'); ?>
+                                        — <?php echo htmlspecialchars($m['eleccion'], ENT_QUOTES, 'UTF-8'); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -255,7 +274,7 @@ $mesas_disponibles = $stmt_mesas->fetchAll();
                     <div class="mb-3">
                         <label class="form-label" style="font-size:0.85rem;">Password</label>
                         <input type="password" name="password_admin"
-                            class="form-control form-select-sm"
+                            class="form-control form-control-sm"
                             autocomplete="current-password"
                             placeholder="Password">
                     </div>

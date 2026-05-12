@@ -2,9 +2,15 @@
 // fiscalizacion/includes/navbar.php
 // Navbar fija superior del modulo Fiscalizacion.
 // Muestra items distintos segun el rol: fiscal, admin, superadmin.
-// El fiscal ve solo el nombre de su mesa y el boton de logout.
-// Admin y superadmin ven el menu completo segun su nivel.
-// Se incluye al inicio de cada modulo autenticado.
+//
+// Estructura del menu por rol:
+//   fiscal     — solo nombre de mesa y logout
+//   admin      — Dashboard | Listados | Observados
+//   superadmin — Dashboard | Listados | Observados | Administracion (dropdown)
+//
+// Administracion (solo superadmin):
+//   - Elecciones (abm_elecciones): gestiona elecciones, dias y mesas
+//   - Usuarios (abm_usuarios): gestiona usuarios fiscales
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -49,7 +55,7 @@
 
             <?php if ($_SESSION['rol'] === 'fiscal'): ?>
 
-            <!-- Fiscal: solo ve el nombre de su mesa -->
+            <!-- Fiscal: solo ve el nombre de su mesa, sin menu -->
             <ul class="navbar-nav me-auto mb-2 mb-md-0">
                 <li class="nav-item">
                     <span class="nav-link text-white-50">
@@ -73,6 +79,11 @@
                     <a class="nav-link" href="index.php?mod=listados">Listados</a>
                 </li>
 
+                <!-- Observados: admin y superadmin -->
+                <li class="nav-item">
+                    <a class="nav-link" href="index.php?mod=observados">Observados</a>
+                </li>
+
                 <?php if ($_SESSION['rol'] === 'superadmin'): ?>
 
                 <!-- Administracion: solo superadmin -->
@@ -83,7 +94,7 @@
                     </a>
                     <ul class="dropdown-menu dropdown-menu-dark">
                         <li>
-                            <a class="dropdown-item" href="index.php?mod=abm_mesas">Mesas</a>
+                            <a class="dropdown-item" href="index.php?mod=abm_elecciones">Elecciones</a>
                         </li>
                         <li>
                             <a class="dropdown-item" href="index.php?mod=abm_usuarios">Usuarios</a>

@@ -13,14 +13,15 @@ require_once 'includes/auth.php';
 
 // Modulos disponibles y sus archivos correspondientes
 $modulos = [
-    'login'         => 'modulos/login/login.php',
-    'logout'        => 'modulos/logout/logout.php',
-    'error'         => 'modulos/error/error.php',
-    'fiscal'        => 'modulos/fiscal/fiscal.php',
-    'dashboard'     => 'modulos/dashboard/dashboard.php',
-    'listados'      => 'modulos/listados/listados.php',
-    'abm_mesas'     => 'modulos/abm_mesas/abm_mesas.php',
-    'abm_usuarios'  => 'modulos/abm_usuarios/abm_usuarios.php',
+    'login'             => 'modulos/login/login.php',
+    'logout'            => 'modulos/logout/logout.php',
+    'error'             => 'modulos/error/error.php',
+    'fiscal'            => 'modulos/fiscal/fiscal.php',
+    'dashboard'         => 'modulos/dashboard/dashboard.php',
+    'listados'          => 'modulos/listados/listados.php',
+    'observados'        => 'modulos/observados/observados.php',
+    'abm_elecciones'    => 'modulos/abm_elecciones/abm_elecciones.php',
+    'abm_usuarios'      => 'modulos/abm_usuarios/abm_usuarios.php',
 ];
 
 // Leer el parametro mod de la URL

@@ -1,7 +1,6 @@
 # Consulta Padron
 
-![Version](https://img.shields.io/badge/version-1.0-green)
-![Estado](https://img.shields.io/badge/estado-completa-green)
+![Estado](https://img.shields.io/badge/estado-completo-green)
 ![PHP](https://img.shields.io/badge/PHP-8.1-777BB4)
 ![Bootstrap](https://img.shields.io/badge/Bootstrap-5-7952B3)
 ![PhpSpreadsheet](https://img.shields.io/badge/PhpSpreadsheet-2.0-217346)
@@ -17,8 +16,8 @@ La aplicacion consume exclusivamente las vistas vista_padron_cd y vista_padron_c
 | Etapa | Entorno |
 |---|---|
 | Desarrollo | Local — XAMPP en C:\xampp\htdocs\fiscalizar\consulta_padron |
-| Aprobacion | Subdominio de fiscalizar.com.ar |
-| Produccion | A definir al momento del pase |
+| Aprobacion | padron.fiscalizar.com.ar |
+| Produccion | padron.fiscalizar.com.ar |
 
 Stack: PHP 8.1, MariaDB 10.6, Bootstrap 5, JavaScript nativo, PhpSpreadsheet via Composer. Sin frameworks PHP.
 
@@ -34,8 +33,19 @@ Resumen:
 2. Copiar config/db.example.php como config/db.php y completar con credenciales locales
 3. Ejecutar composer install dentro de consulta_padron/
 4. Importar fiscaliz_padron.sql en phpMyAdmin
-5. Crear usuario superadmin en la tabla usuarios
-6. Acceder desde http://localhost/fiscalizar/consulta_padron/
+5. Acceder desde http://localhost/fiscalizar/consulta_padron/
+
+---
+
+## Configuracion de base de datos
+
+El archivo config/db.php incluye la siguiente linea despues de crear la conexion PDO:
+
+```php
+$pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
+```
+
+Esta linea es obligatoria. Sin ella, las queries que combinan vista_padron_cd (utf8mb4_spanish_ci) con vista_padron_cp (utf8mb4_unicode_ci) via UNION fallan con error 1271 de collation.
 
 ---
 
@@ -46,7 +56,7 @@ Resumen:
 | Framework CSS | Bootstrap 5 via CDN |
 | Fuente | Inter via Google Fonts |
 | Navbar y footer | #1a1a2e (azul muy oscuro) |
-| Acento principal | #a6d900 (verde lima) |
+| Acento principal | #4f8ef7 (azul medio) |
 | Fondo de pagina | #f0f2f5 (gris claro) |
 | Texto principal | #1a1a2e |
 | Texto secundario | #4a5568 |
@@ -63,7 +73,7 @@ consulta_padron/
 ├── composer.json
 ├── index.php
 ├── config/
-│   ├── db.php
+│   ├── db.php              <- nunca se commitea
 │   └── db.example.php
 ├── includes/
 │   ├── auth.php
@@ -76,6 +86,8 @@ consulta_padron/
 │   │   └── login.php
 │   ├── logout/
 │   │   └── logout.php
+│   ├── error/
+│   │   └── error.php
 │   ├── buscador/
 │   │   └── buscador.php
 │   ├── padrones/
@@ -98,17 +110,15 @@ consulta_padron/
     ├── js/
     │   └── main.js
     └── img/
-        └── logo.png
 ```
 
 ---
 
 ## Routing
 
-No hay framework de routing. index.php recibe todos los requests y decide que modulo cargar segun el parametro mod en la URL.
+No hay framework de routing. index.php recibe todos los requests y decide que modulo cargar segun el parametro mod en la URL. Cualquier excepcion no manejada es capturada por un try/catch global en index.php y redirige al modulo error sin romper la sesion.
 
 ```
-/?mod=login
 /?mod=buscador
 /?mod=padrones
 /?mod=filtros
@@ -117,7 +127,7 @@ No hay framework de routing. index.php recibe todos los requests y decide que mo
 /?mod=abm_trabajos
 /?mod=abm_personas
 /?mod=abm_usuarios
-/?mod=logout
+/?mod=error
 ```
 
 Sin parametro mod carga el buscador por defecto. Sin sesion activa redirige al login.
@@ -149,7 +159,7 @@ auth.php expone tres funciones:
 | Modulo | Archivo | Acceso |
 |---|---|---|
 | Login | modulos/login/login.php | Publico |
-| Logout | modulos/logout/logout.php | Todos |
+| Error | modulos/error/error.php | Todos |
 | Buscador | modulos/buscador/buscador.php | Todos |
 | Padrones | modulos/padrones/padrones.php | Todos |
 | Filtros | modulos/filtros/filtros.php | Todos |
@@ -161,29 +171,67 @@ auth.php expone tres funciones:
 
 ### Buscador
 
-Home del sistema. Input con sugerencias en tiempo real desde 2 caracteres. Busqueda por apellido, apellido nombre (separados por espacio) o DNI. Una sola fila por persona con flags de padron CD y CP. Perfil unificado con referentes, partido, trabajo, sede y todas las votaciones segun los padrones en que figura. Descarga Excel del listado y del perfil individual.
+Home del sistema. Input de busqueda por apellido o DNI. Resultados en tabla con columnas DNI, apellido, nombre, carrera, padron y boton Ver mas por fila. Si hay un unico resultado redirige directamente al perfil. Todo descargable en Excel.
 
 ### Padrones
 
-Tabla de padrones disponibles con botones Ver y Descargar. Al ver, el padron aparece paginado con buscador interno por apellido, apellido nombre o DNI. Scroll horizontal sincronizado arriba y abajo. Descargar genera el Excel completo respetando el buscador activo.
+Tabla de listados disponibles con botones Ver y Descargar por fila. Al ver, el listado aparece paginado debajo (50 registros por pagina) con buscador interno por apellido. Descargar genera el Excel completo sin paginacion.
 
-Padrones disponibles: CD oficial, CP oficial (sin columna auxiliar), CD completo, CP completo.
+Listados disponibles:
+
+| Nombre | Fuente |
+|---|---|
+| Padron CD oficial | padron_cd |
+| Padron CP oficial | padron_cp |
+| Padron CD completo | vista_padron_cd |
+| Padron CP completo | vista_padron_cp |
 
 ### Filtros
 
-Combos en orden: Padron, Referente (incluye opcion Con Referentes), Partido, Trabajo, Auxiliar, Carrera, Eleccion, Voto. Resultado con perfil completo: referentes, partido, trabajo, sede y todas las votaciones CD y CP. Scroll horizontal sincronizado. Descarga Excel del resultado completo sin paginacion.
+Padron y Auxiliares CP son obligatorios. Cuando el padron elegido es CD, el combo Auxiliares CP se deshabilita automaticamente y envia NO al PHP via hidden input.
+
+**Combos disponibles:**
+
+| Combo | Opciones | Notas |
+|---|---|---|
+| Padron | CD / CP | Obligatorio. |
+| Auxiliares CP | SI / NO | Obligatorio. Se deshabilita si padron = CD. |
+| Referente | Lista de activos + Con referentes | Opcional. |
+| Partido | Lista de activos | Opcional. |
+| Trabajo | Lista de activos | Opcional. |
+| Sede | Lista de activas | Opcional. |
+| Carrera | Lista de carreras | Opcional. Se inhibe si padron = CP. |
+| Eleccion | Todas las elecciones | Opcional. |
+| Voto | Voto / No voto | Opcional. Aplica a la eleccion elegida. |
+
+**Logica de combinacion segun Padron y Auxiliares CP:**
+
+| Padron | Auxiliares CP | Resultado |
+|---|---|---|
+| CD | NO | Solo graduados CD |
+| CD | SI | Graduados CD + auxiliares CP |
+| CP | NO | Solo graduados CP sin auxiliares |
+| CP | SI | Padron CP completo |
+
+**Columnas de resultado:** siempre presentes las seis columnas de votos (CD 2021, CD 2024, CP 2017, CP 2019, CP 2021, CP 2024). Las columnas sin dato para ese padron muestran NO. Los campos sin dato muestran texto explicito (SIN REFERENTE, SIN PARTIDO, etc.) en lugar de guion.
+
+Todo resultado es descargable en Excel.
 
 ### ABM Referentes, Partidos, Trabajos
 
-Buscador por nombre arriba del listado. Boton agregar que despliega formulario en collapse. Botones editar y dar de baja en la misma fila. Nunca se elimina un registro fisicamente.
+Listado del catalogo con opciones editar y dar de baja logica. Formulario para agregar nuevo registro. Boton de descarga Excel del listado completo con ID incluido. Nunca se elimina un registro fisicamente. Los registros con activo=0 no aparecen en los combos de filtros ni en las vistas.
 
 ### ABM Personas
 
-Flujo de tres pasos: buscar persona por apellido, apellido nombre o DNI, ver perfil con datos actuales, editar vinculos (referentes, partido, trabajo) via combos de los catalogos correspondientes.
+Flujo de tres pasos: buscar persona por apellido o DNI, ver fila completa con datos actuales, editar vinculos (referentes, partido, trabajo) via combos de los catalogos correspondientes. Solo aparecen en los combos los registros con activo=1.
 
 ### ABM Usuarios
 
-Solo superadmin. Listado con nombre, nivel y estado. Agregar usuario con hash bcrypt. Editar nivel y cambiar password. Activar y desactivar. El superadmin no puede desactivarse a si mismo.
+Solo superadmin. Listado con nombre, nivel y estado. Opciones de editar nivel, activar, desactivar. Formulario para crear nuevo usuario. Passwords con hash bcrypt. El superadmin no puede desactivarse a si mismo.
+
+### Error
+
+Pagina de error generica. Se carga automaticamente cuando cualquier modulo lanza una excepcion no manejada. Muestra mensaje amigable y boton para volver al inicio. La sesion se mantiene activa.
 
 ---
 
@@ -191,7 +239,7 @@ Solo superadmin. Listado con nombre, nivel y estado. Agregar usuario con hash bc
 
 Archivo includes/excel.php, funcion exportar_excel($resultado, $nombre_archivo).
 
-Recibe el resultado de una query como array de filas asociativas y genera un .xlsx para descarga. Las columnas se construyen dinamicamente desde las claves del primer registro. Sin columnas hardcodeadas. Todo listado es siempre descargable en Excel. Nombre del archivo: nombre-del-listado-YYYY-MM-DD.xlsx.
+Recibe el resultado de una query como array de filas asociativas y genera un .xlsx para descarga. Las columnas se construyen dinamicamente desde las claves del primer registro. Sin columnas hardcodeadas. Todo listado es siempre descargable en Excel.
 
 ---
 
@@ -203,15 +251,13 @@ Resumen:
 
 - PHP en UTF-8 sin BOM. Indentacion con 4 espacios. Variables en snake_case. Sin closing tag al final de archivos PHP puros.
 - Siempre prepared statements con PDO. Nunca concatenacion de variables en queries.
+- Parametros posicionales (?) en lugar de nombrados cuando una query combina resultados de vista_padron_cd y vista_padron_cp via UNION. Evita conflicto HY093 al hacer array_merge.
 - Todo input del usuario se trata como potencialmente malicioso. htmlspecialchars() en todo output a pantalla.
 - Todo bloque de logica no trivial va comentado. Los archivos empiezan con un comentario que indica su rol.
-- Nunca consultar tablas directamente. Solo las vistas vista_padron_cd y vista_padron_cp.
+- Los campos disabled en formularios no se envian. Usar hidden inputs para garantizar que el valor llegue al PHP.
 
 ---
 
-## Pendientes para v2
+## Pendientes
 
-- Cargar sede_laboral cuando el administrador tenga el listado tuneado.
-- Validacion profunda de consistencia de datos migrados antes del pase a produccion.
-- Cruces con tablas adicionales: st_siet_2026, st_ucr_caba_2026, st_ucr_pba_2024.
-- Modulo de Fiscalizacion (etapa futura, sistema separado con login propio).
+- Ver [fiscalizacion/README.md](../fiscalizacion/README.md) para el estado actual del modulo de Fiscalizacion.

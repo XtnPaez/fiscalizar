@@ -4,6 +4,13 @@
 // Recibe POST: dni, tipo_voto
 // Devuelve JSON: exito o error
 // Acceso: solo fiscales autenticados con sesion activa.
+//
+// Cambios respecto a la version anterior:
+//   - votos_dia no tiene id_eleccion. El voto se registra solo con dni e id_mesa.
+//   - Para verificar si ya voto, se cruza por las mesas de la eleccion activa
+//     del tipo correspondiente via dias_eleccion -> elecciones.
+//   - El UNIQUE KEY de votos_dia es sobre (dni, id_mesa) o similar — la unicidad
+//     se garantiza verificando antes del INSERT.
 
 session_start();
 require_once '../../config/db.php';
@@ -18,10 +25,10 @@ if (!isset($_SESSION['rol']) || $_SESSION['rol'] !== 'fiscal') {
 
 header('Content-Type: application/json');
 
-$dni        = intval($_POST['dni']       ?? 0);
-$tipo_voto  = trim($_POST['tipo_voto']   ?? '');
-$id_mesa    = $_SESSION['id_mesa'];
-$id_eleccion = $_SESSION['id_eleccion'];
+$dni       = intval($_POST['dni']      ?? 0);
+$tipo_voto = trim($_POST['tipo_voto']  ?? '');
+$id_mesa   = $_SESSION['id_mesa'];
+$tipo      = $_SESSION['tipo_mesa'];
 
 // Validaciones basicas
 if ($dni <= 0) {
@@ -34,26 +41,56 @@ if (!in_array($tipo_voto, ['regular', 'observado'])) {
     exit;
 }
 
-// Verificar que no haya votado ya
+// Verificar que la persona no haya votado ya en ninguna mesa de esta eleccion
+// Se cruza por todas las mesas activas del mismo tipo de eleccion
 $stmt = $pdo->prepare("
-    SELECT id FROM votos_dia
-    WHERE dni = ? AND id_eleccion = ?
+    SELECT v.id FROM votos_dia v
+    JOIN mesas m         ON v.id_mesa = m.id
+    JOIN dias_eleccion d ON m.id_dia = d.id
+    JOIN elecciones e    ON d.id_eleccion = e.id
+    WHERE v.dni = ?
+      AND e.tipo = ?
+      AND e.estado = 'activa'
+    LIMIT 1
 ");
-$stmt->execute([$dni, $id_eleccion]);
+$stmt->execute([$dni, $tipo]);
+
 if ($stmt->fetch()) {
     echo json_encode(['error' => 'Esta persona ya voto en esta eleccion']);
     exit;
 }
 
+// Verificar que el DNI exista en el padron correspondiente
+$tabla = match($tipo) {
+    'cd' => 'padron_cd',
+    'cp' => 'padron_cp',
+    'rt' => 'padron_rt',
+    'cs' => 'padron_cs',
+    default => null
+};
+
+if (!$tabla) {
+    echo json_encode(['error' => 'Tipo de mesa invalido']);
+    exit;
+}
+
+$stmt = $pdo->prepare("SELECT dni FROM $tabla WHERE dni = ?");
+$stmt->execute([$dni]);
+if (!$stmt->fetch()) {
+    echo json_encode(['error' => 'El DNI no figura en el padron de esta eleccion']);
+    exit;
+}
+
 // Registrar el voto
+// El INSERT usa solo dni, id_mesa y tipo_voto — sin id_eleccion
 try {
     $stmt = $pdo->prepare("
-        INSERT INTO votos_dia (dni, id_mesa, id_eleccion, tipo_voto)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO votos_dia (dni, id_mesa, tipo_voto)
+        VALUES (?, ?, ?)
     ");
-    $stmt->execute([$dni, $id_mesa, $id_eleccion, $tipo_voto]);
+    $stmt->execute([$dni, $id_mesa, $tipo_voto]);
     echo json_encode(['ok' => true]);
 } catch (Exception $e) {
-    // El UNIQUE KEY sobre (dni, id_eleccion) puede dispararse por concurrencia
+    // Puede dispararse por concurrencia si dos mesas registran el mismo DNI
     echo json_encode(['error' => 'No se pudo registrar el voto. Intenta de nuevo.']);
 }
