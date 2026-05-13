@@ -60,7 +60,14 @@ $conteo_votos = $stmt_votos->fetchAll();
 require_once 'includes/navbar.php';
 ?>
 
-<div class="modulo-titulo">Dashboard</div>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="modulo-titulo">Dashboard</div>
+    <!-- Boton Actualizar: util en mobile para refrescar estado de mesas sin F5 -->
+    <button type="button" class="btn btn-sm btn-outline-secondary"
+            onclick="window.location.reload()">
+        ↻ Actualizar
+    </button>
+</div>
 
 <?php if (isset($_GET['error']) && $_GET['error'] === 'acceso_denegado'): ?>
     <div class="alert alert-danger py-2 mb-3" style="font-size:0.85rem;">
