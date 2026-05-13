@@ -246,6 +246,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // Editar nombre de una mesa
+    if ($accion === 'editar_nombre_mesa') {
+        $id_mesa     = intval($_POST['id_mesa']      ?? 0);
+        $id_dia      = intval($_POST['id_dia']       ?? 0);
+        $id_eleccion = intval($_POST['id_eleccion']  ?? 0);
+        $nuevo_nombre = trim($_POST['nuevo_nombre']  ?? '');
+
+        if ($id_mesa > 0 && $nuevo_nombre !== '') {
+            $pdo->prepare("
+                UPDATE mesas SET nombre = ? WHERE id = ?
+            ")->execute([$nuevo_nombre, $id_mesa]);
+        }
+        header('Location: index.php?mod=abm_elecciones&pestana=mesas&id_dia=' . $id_dia . '&id_eleccion=' . $id_eleccion . '&ok=nombre_actualizado');
+        exit;
+    }
+
     // Cambiar password de una mesa
     if ($accion === 'cambiar_password') {
         $id_mesa     = intval($_POST['id_mesa'] ?? 0);
@@ -288,6 +304,7 @@ $mensajes_ok = [
     'dia_deshabilitado'    => 'Dia deshabilitado. Las mesas quedaron liberadas.',
     'mesa_creada'          => 'Mesa creada correctamente.',
     'mesa_liberada'        => 'Mesa liberada. El fiscal puede volver a loguearse.',
+    'nombre_actualizado'   => 'Nombre de la mesa actualizado.',
     'password_cambiado'    => 'Password de la mesa actualizado.',
 ];
 
@@ -384,6 +401,12 @@ require_once 'includes/navbar.php';
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <div class="modulo-titulo">Administracion de Elecciones</div>
+    <!-- Boton Actualizar: util en mobile donde F5 no es accesible.
+         Recarga la URL actual preservando pestana y seleccion activa. -->
+    <button type="button" class="btn btn-sm btn-outline-secondary"
+            onclick="window.location.reload()">
+        ↻ Actualizar
+    </button>
 </div>
 
 <?php if ($ok && isset($mensajes_ok[$ok])): ?>
@@ -672,7 +695,66 @@ require_once 'includes/navbar.php';
 <!-- PESTANA 3 — MESAS                                            -->
 <!-- ============================================================ -->
 
-<!-- Selector de dia -->
+<!-- Cuando se llega a la pestana sin id_dia (desde el navbar),
+     se muestran dos selectores encadenados: eleccion -> dia.
+     Cuando se llega con id_dia (desde el boton Mesas de la pestana Dias),
+     se muestra directamente el contenido de las mesas. -->
+
+<?php if (!$id_dia): ?>
+
+<!-- Selector de eleccion -->
+<form method="GET" action="index.php" class="mb-3">
+    <input type="hidden" name="mod" value="abm_elecciones">
+    <input type="hidden" name="pestana" value="mesas">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label form-label-sm">Eleccion</label>
+            <select name="id_eleccion" class="form-select form-select-sm"
+                    onchange="this.form.submit()">
+                <option value="">— elegir eleccion —</option>
+                <?php foreach ($elecciones_disponibles as $ed): ?>
+                <option value="<?php echo $ed['id']; ?>"
+                    <?php echo $id_eleccion === intval($ed['id']) ? 'selected' : ''; ?>>
+                    <?php echo htmlspecialchars($ed['nombre'], ENT_QUOTES, 'UTF-8'); ?>
+                    (<?php echo strtoupper($ed['tipo']); ?>)
+                </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    </div>
+</form>
+
+<?php if ($id_eleccion && $eleccion_activa): ?>
+
+<!-- Selector de dia — aparece una vez elegida la eleccion -->
+<form method="GET" action="index.php" class="mb-3">
+    <input type="hidden" name="mod" value="abm_elecciones">
+    <input type="hidden" name="pestana" value="mesas">
+    <input type="hidden" name="id_eleccion" value="<?php echo $id_eleccion; ?>">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label form-label-sm">Dia</label>
+            <select name="id_dia" class="form-select form-select-sm"
+                    onchange="this.form.submit()">
+                <option value="">— elegir dia —</option>
+                <?php foreach ($dias as $d): ?>
+                <option value="<?php echo $d['id']; ?>">
+                    <?php echo htmlspecialchars($d['nombre'], ENT_QUOTES, 'UTF-8'); ?>
+                    <?php if ($d['habilitado']): ?>
+                        <span>(HABILITADO)</span>
+                    <?php endif; ?>
+                </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    </div>
+</form>
+
+<?php endif; // fin if id_eleccion sin id_dia ?>
+
+<?php else: ?>
+<!-- Llegamos con id_dia desde el boton Mesas de la pestana Dias -->
+
 <div class="mb-3">
     <?php if ($id_eleccion && $eleccion_activa): ?>
     <div class="mb-2">
@@ -696,6 +778,8 @@ require_once 'includes/navbar.php';
     </div>
     <?php endif; ?>
 </div>
+
+<?php endif; // fin if !id_dia ?>
 
 <?php if ($id_dia && $dia_activo): ?>
 
@@ -772,6 +856,13 @@ require_once 'includes/navbar.php';
                         </form>
                         <?php endif; ?>
 
+                        <!-- Editar nombre: modal inline -->
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                data-bs-toggle="modal"
+                                data-bs-target="#modalNombre<?php echo $m['id']; ?>">
+                            Nombre
+                        </button>
+
                         <!-- Cambiar password: modal inline -->
                         <button type="button" class="btn btn-sm btn-outline-secondary"
                                 data-bs-toggle="modal"
@@ -782,6 +873,36 @@ require_once 'includes/navbar.php';
                     </div>
                 </td>
             </tr>
+
+            <!-- Modal editar nombre de la mesa -->
+            <div class="modal fade" id="modalNombre<?php echo $m['id']; ?>"
+                 tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-sm">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h6 class="modal-title">
+                                Editar nombre — <?php echo htmlspecialchars($m['nombre'], ENT_QUOTES, 'UTF-8'); ?>
+                            </h6>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form method="POST" action="index.php?mod=abm_elecciones">
+                            <input type="hidden" name="accion" value="editar_nombre_mesa">
+                            <input type="hidden" name="id_mesa" value="<?php echo $m['id']; ?>">
+                            <input type="hidden" name="id_dia" value="<?php echo $id_dia; ?>">
+                            <input type="hidden" name="id_eleccion" value="<?php echo $id_eleccion; ?>">
+                            <div class="modal-body">
+                                <input type="text" name="nuevo_nombre"
+                                       class="form-control form-control-sm"
+                                       value="<?php echo htmlspecialchars($m['nombre'], ENT_QUOTES, 'UTF-8'); ?>"
+                                       required maxlength="60">
+                            </div>
+                            <div class="modal-footer">
+                                <button type="submit" class="btn btn-sm btn-primary">Guardar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
 
             <!-- Modal cambio de password para esta mesa -->
             <div class="modal fade" id="modalPassword<?php echo $m['id']; ?>"

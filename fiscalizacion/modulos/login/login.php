@@ -33,11 +33,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_fiscal'])) {
 
     if ($id_mesa > 0 && $password !== '') {
 
-        // Buscar la mesa con su dia y eleccion
-        // La mesa debe pertenecer a un dia habilitado de una eleccion activa
-        // y no estar en uso
+        // Buscar la mesa con su dia y eleccion.
+        // No filtramos por en_uso = 0: un fiscal puede reconectarse a su mesa
+        // aunque en_uso = 1 (por ejemplo si cerro el browser sin hacer logout).
+        // El password correcto es la autorización suficiente.
         $stmt = $pdo->prepare("
-            SELECT m.id, m.nombre, m.tipo, m.password, m.activa,
+            SELECT m.id, m.nombre, m.tipo, m.password, m.activa, m.en_uso,
                    d.id AS id_dia,
                    e.id AS id_eleccion
             FROM mesas m
@@ -46,7 +47,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_fiscal'])) {
             WHERE m.id = ?
               AND d.habilitado = 1
               AND e.estado = 'activa'
-              AND m.en_uso = 0
         ");
         $stmt->execute([$id_mesa]);
         $mesa = $stmt->fetch();
@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_fiscal'])) {
             if (!$mesa['activa']) {
                 $error_fiscal = 'La mesa no esta activa para recibir votos.';
             } else {
-                // Marcar mesa en uso
+                // Marcar mesa en uso (puede ya estar en 1 si el fiscal se reconecta)
                 $pdo->prepare("UPDATE mesas SET en_uso = 1 WHERE id = ?")
                     ->execute([$mesa['id']]);
 
@@ -117,15 +117,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_admin'])) {
 }
 
 // --- Cargar mesas disponibles para el combo ---
-// Solo mesas de dias habilitados de elecciones activas, no en uso
+// Mesas de dias habilitados de elecciones activas.
+// Se incluyen mesas con en_uso = 1 para permitir reconexion del fiscal
+// que cerro el browser sin hacer logout. El password es la autorizacion.
+// Las mesas en_uso se marcan visualmente para que el fiscal sepa que
+// ya hay una sesion activa y puede ser que este reconectandose.
 $stmt_mesas = $pdo->query("
-    SELECT m.id, m.nombre, m.tipo, e.nombre AS eleccion
+    SELECT m.id, m.nombre, m.tipo, m.en_uso, e.nombre AS eleccion
     FROM mesas m
     JOIN dias_eleccion d ON m.id_dia = d.id
     JOIN elecciones e    ON d.id_eleccion = e.id
     WHERE d.habilitado = 1
       AND e.estado = 'activa'
-      AND m.en_uso = 0
     ORDER BY m.tipo, m.nombre
 ");
 $mesas_disponibles = $stmt_mesas->fetchAll();
@@ -222,6 +225,7 @@ $mesas_disponibles = $stmt_mesas->fetchAll();
                                     <option value="<?php echo $m['id']; ?>">
                                         <?php echo htmlspecialchars($m['nombre'], ENT_QUOTES, 'UTF-8'); ?>
                                         — <?php echo htmlspecialchars($m['eleccion'], ENT_QUOTES, 'UTF-8'); ?>
+                                        <?php echo $m['en_uso'] ? '(en uso — reconectar)' : ''; ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>

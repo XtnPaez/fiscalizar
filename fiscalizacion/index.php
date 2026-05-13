@@ -6,6 +6,18 @@
 // Sin parametro mod carga el login por defecto.
 // Cualquier excepcion no manejada redirige al modulo error sin romper la sesion.
 
+// Configuracion de cookie de sesion persistente.
+// lifetime = 86400 = 24 horas. La cookie se guarda en disco y sobrevive
+// al cierre del browser — critico para fiscales en telefono mobile.
+// secure = true: solo se envia por HTTPS.
+// httponly = true: no accesible desde JS (proteccion XSS).
+// samesite = Strict: no se envia en requests cross-site.
+session_set_cookie_params([
+    'lifetime' => 86400,
+    'secure'   => true,
+    'httponly' => true,
+    'samesite' => 'Strict',
+]);
 session_start();
 
 require_once 'config/db.php';
@@ -20,6 +32,7 @@ $modulos = [
     'dashboard'         => 'modulos/dashboard/dashboard.php',
     'listados'          => 'modulos/listados/listados.php',
     'observados'        => 'modulos/observados/observados.php',
+    'punteo'            => 'modulos/punteo/punteo.php',
     'abm_elecciones'    => 'modulos/abm_elecciones/abm_elecciones.php',
     'abm_usuarios'      => 'modulos/abm_usuarios/abm_usuarios.php',
 ];
