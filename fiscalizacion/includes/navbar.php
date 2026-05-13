@@ -84,6 +84,11 @@
                     <a class="nav-link" href="index.php?mod=observados">Observados</a>
                 </li>
 
+                <!-- Punteo: admin y superadmin -->
+                <li class="nav-item">
+                    <a class="nav-link" href="index.php?mod=punteo">Punteo</a>
+                </li>
+
                 <?php if ($_SESSION['rol'] === 'superadmin'): ?>
 
                 <!-- Administracion: solo superadmin -->
