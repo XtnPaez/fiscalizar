@@ -22,22 +22,22 @@ la misma base de datos (fiscaliz_padron).
 | Subdominio | padron.fiscalizar.com.ar | fiscalizar.com.ar |
 | Carpeta en el repo | consulta_padron/ | fiscalizacion/ |
 | Rama de desarrollo | consulta-padron | fiscalizacion |
-| Usuarios | Referentes politicos, admin | Fiscales, admin electoral, superadmin |
+| Usuarios | Referentes politicos, admin | Fiscales, mira, admin, superadmin |
 | Login | Propio, tabla usuarios | Propio, tablas mesas y usuarios_fiscal |
 | Base de datos | fiscaliz_padron | fiscaliz_padron (compartida) |
 
 Comparten la base pero no comparten codigo, usuarios ni sesiones.
-Un usuario de Consulta Padron no tiene acceso a Fiscalizacion y viceversa.
 
 ---
 
 ## Que hace este modulo
 
 - Administracion de elecciones, dias y mesas desde la interfaz (superadmin).
-- Login de mesas electorales y de usuarios admin/superadmin.
+- Login de mesas electorales y de usuarios admin/superadmin/mira.
 - Registro de votos en tiempo real durante el dia de la eleccion.
 - Busqueda rapida en el padron desde el telefono del fiscal.
-- Listados con voto del dia y buscador de persona por padron.
+- Listados con voto del dia, filtros y buscador de persona (admin/superadmin).
+- Consulta simplificada del padron propio con filtro de voto (mira).
 - Registro y visualizacion de votos observados.
 - Punteo de nuestra lista por corte y por mesa con proyecciones.
 - Gestion de usuarios fiscales desde el superadmin.
@@ -47,7 +47,7 @@ Un usuario de Consulta Padron no tiene acceso a Fiscalizacion y viceversa.
 ## Jerarquia de datos electorales
 
 ```
-ELECCION (cd / cp / rt / cs)
+ELECCION (cd / cp / rt / cs) — estado: programada / activa / cerrada
     └── DIA (Lunes, Martes, Miercoles...)
             └── MESA (CD-LU-M1, CP-MA-M2...)
                     └── VOTOS (votos_dia)
@@ -70,17 +70,24 @@ No tiene usuario propio. La mesa es el usuario.
 Pantalla unica:
 - Nombre de la mesa (solo lectura).
 - Campo de busqueda por DNI o apellido (filtra en tiempo real via AJAX).
-- Resultados: persona que no voto = seleccionable / persona que ya voto = bloqueada con badge YA VOTO.
-- Al seleccionar: nombre, DNI, radio button tipo de voto (regular por defecto / observado).
-- Boton confirmar voto.
-- Boton logout con confirmacion (evita logout accidental en telefono).
+- Resultados: persona que no voto = seleccionable / ya voto = bloqueada con badge YA VOTO.
+- Al seleccionar: nombre, DNI, radio button tipo de voto (regular / observado).
+- Boton confirmar voto con modal de confirmacion.
+- Boton logout con confirmacion.
 
-El fiscal no ve estadisticas de ningun tipo.
+Si el admin libera la mesa mientras el fiscal tiene sesion activa, el proximo
+intento de registrar un voto muestra un aviso y redirige al logout automaticamente.
+
+### Mira
+
+Usuario de solo lectura para un padron especifico (cd/cp/rt/cs).
+Se loguea con usuario y password desde la seccion de administradores.
+Solo ve el modulo Consulta — su padron con filtro de voto y buscador.
 
 ### Admin
 
-- Dashboard con conteo de votos de las elecciones activas. No ve estado de mesas.
-- Listados: padron completo por eleccion con voto del dia, filtros y buscador de persona.
+- Dashboard con conteo de votos de las elecciones activas.
+- Listados: padron por eleccion con voto del dia, filtros (referente/partido/trabajo/voto) y buscador de persona.
 - Observados: listado de votos observados de todas las elecciones activas.
 - Punteo: carga de cortes por mesa y vista consolidada con proyecciones.
 
@@ -92,52 +99,54 @@ El fiscal no ve estadisticas de ningun tipo.
 
 ---
 
-## Tablas propias de fiscalizacion
+## Niveles de acceso
 
-Estas tablas se agregan a fiscaliz_padron sin modificar las tablas de Consulta Padron.
+| Nivel | Modulos habilitados |
+|---|---|
+| fiscal | fiscal |
+| mira | consulta (solo su padron) |
+| admin | dashboard, listados, observados, punteo |
+| superadmin | todo lo anterior mas abm_elecciones, abm_usuarios |
+
+---
+
+## Tablas propias de fiscalizacion
 
 ### `elecciones` (modificada)
 
-El campo `activa TINYINT(1)` fue reemplazado por `estado ENUM('programada','activa','cerrada')`.
+Campo `activa TINYINT(1)` reemplazado por `estado ENUM('programada','activa','cerrada')`.
 
 | Estado | Descripcion |
 |---|---|
 | programada | Creada, sin activar. Dias y mesas pueden configurarse. |
-| activa | En curso. Los listados la muestran. Los fiscales pueden loguearse. |
+| activa | En curso. Listados y consulta la muestran. Fiscales pueden loguearse. |
 | cerrada | Finalizada. Votos migrados a participacion_electoral. |
 
-Solo puede haber una eleccion activa por tipo (cd/cp/rt/cs) simultaneamente.
-
 ### `dias_eleccion`
-
-Nivel intermedio entre elecciones y mesas. La habilitacion opera a este nivel.
 
 | Campo | Tipo | Descripcion |
 |---|---|---|
 | `id` | INT | PK. AUTO_INCREMENT. |
 | `id_eleccion` | INT | FK a elecciones. |
-| `nombre` | VARCHAR(30) | Ej: Lunes, Martes, Miercoles. |
-| `habilitado` | TINYINT(1) | 1 = mesas del dia visibles en el login. Default 0. |
+| `nombre` | VARCHAR(30) | Ej: Lunes, Martes. |
+| `habilitado` | TINYINT(1) | 1 = mesas del dia visibles en login. Default 0. |
 
 ### `mesas`
 
 | Campo | Tipo | Descripcion |
 |---|---|---|
 | `id` | INT | PK. AUTO_INCREMENT. |
-| `nombre` | VARCHAR(60) | Ej: CD-LU-M1, CP-MA-M2. |
+| `nombre` | VARCHAR(60) | Ej: CD-LU-M1. |
 | `tipo` | ENUM('cd','cp','rt','cs') | Tipo de padron que atiende. |
 | `id_dia` | INT | FK a dias_eleccion. |
 | `password` | VARCHAR(255) | Hash bcrypt. |
-| `en_uso` | TINYINT(1) | 1 = hay sesion activa. Default 0. |
+| `en_uso` | TINYINT(1) | 1 = sesion activa. Default 0. |
 | `activa` | TINYINT(1) | 1 = puede recibir votos. Default 1. |
 
-Nota: el campo `habilitada` existe en la tabla pero esta deprecado. La habilitacion
-se hereda de `dias_eleccion.habilitado`.
+Nota: el campo `habilitada` existe pero esta deprecado.
+La habilitacion se hereda de `dias_eleccion.habilitado`.
 
 ### `votos_dia`
-
-Registro en tiempo real del dia de la eleccion.
-Al cerrar la eleccion sus registros se migran a participacion_electoral.
 
 | Campo | Tipo | Descripcion |
 |---|---|---|
@@ -145,58 +154,50 @@ Al cerrar la eleccion sus registros se migran a participacion_electoral.
 | `dni` | INT UNSIGNED | DNI del votante. |
 | `id_mesa` | INT | FK a mesas. |
 | `tipo_voto` | ENUM('regular','observado') | Default regular. |
-| `timestamp` | DATETIME | Fecha y hora. Default CURRENT_TIMESTAMP. |
+| `timestamp` | DATETIME | Default CURRENT_TIMESTAMP. |
 
-UNIQUE KEY sobre (dni, id_mesa): un DNI no puede votar dos veces en la misma mesa.
-La eleccion se obtiene via id_mesa -> dias_eleccion -> elecciones.
+UNIQUE KEY (dni, id_mesa). La eleccion se obtiene via id_mesa -> dias_eleccion -> elecciones.
+Al cerrar la eleccion, los registros se migran a participacion_electoral.
 
 ### `usuarios_fiscal`
-
-Solo para superadmin y admin. Los fiscales no tienen fila aqui.
 
 | Campo | Tipo | Descripcion |
 |---|---|---|
 | `id` | INT | PK. AUTO_INCREMENT. |
-| `usuario` | VARCHAR(60) | Nombre de usuario. Unico. |
+| `usuario` | VARCHAR(60) | Unico. |
 | `password` | VARCHAR(255) | Hash bcrypt. |
-| `nivel` | ENUM('superadmin','admin') | Nivel de acceso. |
-| `activo` | TINYINT(1) | 1 activo, 0 baja logica. Default 1. |
+| `nivel` | ENUM('superadmin','admin','mira') | Nivel de acceso. |
+| `tipo` | ENUM('cd','cp','rt','cs') NULL | Solo para nivel mira. Define el padron. |
+| `activo` | TINYINT(1) | 1 activo, 0 baja logica. |
 
 ### `punteo`
-
-Registro del punteo de nuestra lista por corte y por mesa.
-Un corte = cada vez que los fiscales entran al cuarto oscuro a reponer boletas.
-Normalmente cada 20 votantes, pero el numero real se ingresa en cada corte.
 
 | Campo | Tipo | Descripcion |
 |---|---|---|
 | `id` | INT | PK. AUTO_INCREMENT. |
 | `id_mesa` | INT | FK a mesas. |
-| `numero_corte` | INT | Numero de corte dentro de la mesa. Asignado automaticamente. |
+| `numero_corte` | INT | Asignado automaticamente (MAX+1 por mesa). |
 | `votantes` | INT | Votantes en este corte. Normalmente 20, puede variar. |
 | `faltantes` | INT | Boletas de nuestra lista que faltaron = votos estimados. |
-| `timestamp` | DATETIME | Fecha y hora. Default CURRENT_TIMESTAMP. |
+| `timestamp` | DATETIME | Default CURRENT_TIMESTAMP. |
 
-UNIQUE KEY sobre (id_mesa, numero_corte).
-Los acumulados (total votantes, total faltantes, porcentaje) se calculan siempre,
-nunca se almacenan.
+UNIQUE KEY (id_mesa, numero_corte). Acumulados calculados siempre, nunca almacenados.
 
 ---
 
 ## Vistas propias de fiscalizacion
 
-Cuatro vistas creadas especificamente para este modulo. No reemplazan ni modifican
-las vistas de Consulta Padron (vista_padron_cd, vista_padron_cp).
-
-| Vista | Fuente | Diferencia con Consulta Padron |
+| Vista | Fuente | Campo especial |
 |---|---|---|
-| vista_fiscal_cd | padron_cd | VOTO_2026 desde votos_dia. Incluye CARRERA. Sin AUXILIAR. |
-| vista_fiscal_cp | padron_cp | VOTO_2026 desde votos_dia. Incluye AUXILIAR. Sin CARRERA. |
-| vista_fiscal_rt | padron_rt | VOTO_2026 desde votos_dia. AUXILIAR desde tabla auxiliares (id_carrera=3). |
-| vista_fiscal_cs | padron_cs | VOTO_2026 desde votos_dia. AUXILIAR desde tabla auxiliares (id_carrera=1). |
+| vista_fiscal_cd | padron_cd | CARRERA. Sin AUXILIAR. |
+| vista_fiscal_cp | padron_cp | AUXILIAR desde padron_cp.auxiliar. |
+| vista_fiscal_rt | padron_rt | AUXILIAR desde auxiliares id_carrera=3. |
+| vista_fiscal_cs | padron_cs | AUXILIAR desde auxiliares id_carrera=1. |
 
-El campo VOTO_2026 usa EXISTS + subquery sobre mesas de la eleccion activa del tipo
-correspondiente para evitar duplicados cuando una eleccion tiene mas de un dia.
+Todas incluyen VOTO_2026 desde votos_dia usando EXISTS + subquery sobre mesas
+de la eleccion activa del tipo correspondiente (evita duplicados por multiples dias).
+
+No reemplazan ni modifican las vistas de Consulta Padron.
 
 ---
 
@@ -205,14 +206,18 @@ correspondiente para evitar duplicados cuando una eleccion tiene mas de un dia.
 Pantalla unica con dos secciones visualmente separadas.
 
 Seccion superior — Fiscales:
-- Combo con mesas cuyos dias estan habilitados, de elecciones activas, no en uso.
+- Combo con mesas de dias habilitados, elecciones activas, en_uso = 0.
 - Campo password.
 - Al autenticar: sesion con rol=fiscal, id_mesa, tipo_mesa, nombre_mesa, id_eleccion.
 
-Seccion inferior — Admin y Superadmin:
-- Campo usuario.
-- Campo password.
-- Al autenticar: sesion con rol=admin o superadmin.
+Seccion inferior — Admin, Superadmin y Mira:
+- Campo usuario y password.
+- Al autenticar segun nivel:
+  - superadmin / admin → dashboard
+  - mira → consulta (con tipo_mira en sesion)
+
+Cookie de sesion con lifetime 24hs, secure, httponly, samesite Strict.
+Persiste aunque el fiscal cierre el browser.
 
 ---
 
@@ -251,6 +256,8 @@ fiscalizacion/
 │   │   └── observados.php
 │   ├── punteo/
 │   │   └── punteo.php
+│   ├── consulta/
+│   │   └── consulta.php
 │   ├── abm_elecciones/
 │   │   └── abm_elecciones.php
 │   └── abm_usuarios/
@@ -267,8 +274,6 @@ fiscalizacion/
 
 ## Routing
 
-Mismo patron que Consulta Padron. index.php decide el modulo segun ?mod=.
-
 ```
 /?mod=login
 /?mod=logout
@@ -278,6 +283,7 @@ Mismo patron que Consulta Padron. index.php decide el modulo segun ?mod=.
 /?mod=listados
 /?mod=observados
 /?mod=punteo
+/?mod=consulta
 /?mod=abm_elecciones
 /?mod=abm_usuarios
 ```
@@ -298,137 +304,140 @@ Sin mod carga login. Sin sesion redirige al login.
 | Listados | modulos/listados/listados.php | admin, superadmin |
 | Observados | modulos/observados/observados.php | admin, superadmin |
 | Punteo | modulos/punteo/punteo.php | admin, superadmin |
+| Consulta | modulos/consulta/consulta.php | mira |
 | ABM Elecciones | modulos/abm_elecciones/abm_elecciones.php | superadmin |
 | ABM Usuarios | modulos/abm_usuarios/abm_usuarios.php | superadmin |
 
 ### Fiscal
 
-Pantalla unica de busqueda y registro de voto. Busqueda AJAX por DNI o apellido
-en el padron del tipo de mesa (cd/cp/rt/cs). Personas que ya votaron aparecen
-bloqueadas. Confirmacion de voto con tipo (regular/observado). Logout con
-confirmacion y pantalla de agradecimiento.
+Pantalla unica de busqueda y registro de voto. Busqueda AJAX por DNI o apellido.
+Personas que ya votaron aparecen bloqueadas. Confirmacion con tipo (regular/observado).
+Si la mesa es liberada por el admin durante la sesion, el proximo intento de voto
+muestra aviso y redirige al logout automaticamente.
 
 ### Dashboard
 
 Admin: conteo de votos por eleccion activa.
-Superadmin: ademas ve estado de cada mesa (en uso / libre) con opcion de liberar
-mesas caidas sin necesidad de ir al ABM.
+Superadmin: ademas ve estado de cada mesa con opcion de liberar mesas caidas.
+Boton Actualizar para refrescar sin F5 (util en mobile).
 
 ### Listados
 
 Dos secciones:
 
-Buscador de persona: input unico (apellido o DNI), busca en todos los padrones
-de elecciones activas, muestra en que padrones figura y si voto en cada uno.
-Una fila por padron. Descargable en Excel.
+Buscador de persona: busca en todos los padrones de elecciones activas,
+muestra en que padrones figura y si voto. Una fila por padron. Excel.
 
-Listado por eleccion: combo de elecciones activas, filtros opcionales por
-referente/partido/trabajo, tabla con DNI/apellido/nombre/carrera-o-auxiliar/voto.
-Descargable en Excel con los filtros activos.
+Listado por eleccion: combo de elecciones activas. Filtros: referente, partido,
+trabajo, voto (SI/NO/Todos). Columnas segun tipo (CD con carrera, CP/RT/CS con auxiliar).
+Excel con filtros activos.
 
 ### Observados
 
-Listado de todos los votos observados de todas las elecciones activas juntas.
-Columnas: ELECCION | MESA | DNI | APELLIDO | NOMBRE. Descargable en Excel.
-Sin filtros. Se usa durante el escrutinio para resolver cada caso.
+Votos observados de todas las elecciones activas. ELECCION | MESA | DNI | APELLIDO | NOMBRE.
+Excel. Sin filtros.
 
 ### Punteo
 
-Registro del punteo de nuestra lista durante el dia de la eleccion.
-
-Seccion 1 — Carga por mesa: elegir eleccion y mesa, ver cortes cargados
-con % por corte y acumulado, cargar nuevo corte (votantes + faltantes),
-editar cortes existentes via modal. El numero de corte es automatico.
-
-Seccion 2 — Consolidado por eleccion: tabla por mesa con cortes/votantes/
-faltantes/%, fila TOTAL. Proyecciones sobre el total de faltantes:
-x 0.90, x 0.85, y factor variable calculado en tiempo real con JS.
+Carga de cortes por mesa (votantes + faltantes, numero automatico, edicion via modal).
+Consolidado por eleccion: tabla por mesa con %, fila TOTAL.
+Proyecciones x 0.90, x 0.85 y factor variable con JS en tiempo real.
 Cada proyeccion muestra resultado estimado y % estimado sobre votantes totales.
+
+### Consulta
+
+Solo para nivel mira. Muestra el padron de su tipo (cd/cp/rt/cs) en la eleccion activa.
+Buscador por DNI, apellido o nombre. Filtro voto SI/NO/Todos.
+Sin filtrar muestra mensaje de bienvenida. Al enviar el form con Todos muestra
+el padron completo con columna voto SI/NO. Excel.
 
 ### ABM Elecciones
 
 Tres pestanas:
 
-Pestana Elecciones: crear nueva eleccion (nombre/tipo/anio), activar (verifica
-que no haya otra activa del mismo tipo), desactivar (verifica dias deshabilitados),
-cerrar y migrar votos a participacion_electoral (marca eleccion como cerrada).
+Elecciones: crear (nombre/tipo/anio), activar, desactivar, cerrar y migrar votos.
+Los botones Desactivar y Cerrar se deshabilitan si hay dias habilitados.
 
-Pestana Dias: elegir eleccion, crear dias, habilitar/deshabilitar. Al deshabilitar
-un dia libera automaticamente el en_uso de todas sus mesas.
+Dias: crear dias para una eleccion, habilitar/deshabilitar. Al deshabilitar un dia
+libera automaticamente el en_uso de todas sus mesas.
 
-Pestana Mesas: elegir dia, crear mesas (hereda tipo de la eleccion, genera hash
-bcrypt del password), liberar mesa caida, cambiar password via modal.
+Mesas: crear mesas (hereda tipo de la eleccion, bcrypt del password), editar nombre,
+cambiar password, liberar mesa caida. Si se llega sin id_dia desde el navbar,
+muestra selectores encadenados eleccion -> dia antes de las mesas.
+Boton Actualizar para refrescar sin F5.
 
 ### ABM Usuarios
 
-Solo superadmin. Listado con nombre/nivel/estado. Crear nuevo usuario (usuario,
-password, nivel). Editar nivel via modal. Activar/desactivar. Cambiar password
-via modal. El superadmin no puede desactivarse a si mismo.
+Listado con usuario/nivel/tipo/estado. Crear nuevo usuario con usuario, password, nivel
+y — si el nivel es mira — tipo de padron (CD/CP/RT/CS). Editar nivel via modal.
+Activar/desactivar. Cambiar password via modal.
+El superadmin no puede desactivarse a si mismo.
 
 ---
 
 ## Autenticacion
 
-auth.php expone tres funciones:
+auth.php expone cuatro funciones:
 
 - verificar_sesion_fiscal() — cualquier rol autenticado.
 - verificar_admin_fiscal() — admin o superadmin.
 - verificar_superadmin_fiscal() — solo superadmin.
+- verificar_mira_fiscal() — solo mira.
 
 Los endpoints AJAX (buscar.php, registrar_voto.php) verifican sesion y rol
-manualmente sin usar las funciones de auth.php porque no tienen acceso al
-contexto del router.
-
----
-
-## Niveles de acceso
-
-| Nivel | Modulos habilitados |
-|---|---|
-| fiscal | fiscal |
-| admin | dashboard, listados, observados, punteo |
-| superadmin | todo lo anterior mas abm_elecciones, abm_usuarios |
+manualmente sin usar las funciones de auth.php.
 
 ---
 
 ## Exportacion a Excel
 
 Archivo includes/excel.php, funcion exportar_excel($resultado, $nombre_archivo).
-Identica a la de Consulta Padron. Copiada para mantener independencia entre modulos.
 Las columnas se construyen dinamicamente desde las claves del primer registro.
+Disponible en: listados, observados, punteo (pendiente), consulta.
 
 ---
 
 ## Scripts de mantenimiento
 
-Ejecutar siempre en phpMyAdmin directamente. Nunca exponer en el front.
+Ejecutar siempre en phpMyAdmin. Nunca exponer en el front.
 
-**reset_dia.sql** — limpia votos_dia y punteo, libera en_uso de todas las mesas.
+**reset_dia.sql** — TRUNCATE votos_dia y punteo, UPDATE mesas SET en_uso = 0.
 Usar antes de cada sesion de prueba.
 
 **reset_total.sql** — borra mesas, dias, usuarios_fiscal, punteo y votos.
-Resetea estado de elecciones a programada. No toca Consulta Padron.
+Resetea elecciones a programada. No toca Consulta Padron.
 Despues de ejecutar hay que recrear el superadmin.
+
+---
+
+## Scripts de estructura
+
+**fiscaliz_estructura_v2.sql** — cambios estructurales junio 2026:
+reemplaza activa por estado ENUM, crea dias_eleccion, modifica mesas,
+limpia votos y mesas de prueba.
+
+**fiscaliz_mira.sql** — agrega nivel mira al ENUM de usuarios_fiscal
+y campo tipo ENUM('cd','cp','rt','cs') NULL.
+
+**vista_fiscal.sql** — crea las cuatro vistas de fiscalizacion.
 
 ---
 
 ## Nota de collation
 
-db.php debe incluir esta linea despues de crear la conexion PDO:
+db.php debe incluir despues de crear la conexion PDO:
 
 ```php
 $pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
 ```
 
-Sin esta linea las queries que combinan vistas de distintas collations fallan
-con error 1271.
+Sin esta linea las queries que combinan vistas de distintas collations fallan.
 
 ---
 
 ## Pendientes
 
-- Validacion profunda de consistencia de datos antes del pase a produccion real.
-- Modulo de migracion votos_dia -> participacion_electoral al cierre (implementado
-  en ABM Elecciones — pendiente prueba con datos reales).
-- Vistas vista_padron_cd y vista_padron_cp de Consulta Padron: evaluar en version 2
-  si incorporan votos de elecciones RT y CS cuando esten disponibles.
+- Prueba completa del flujo electoral con datos reales.
+- Migracion votos_dia -> participacion_electoral al cierre (implementada en
+  ABM Elecciones — pendiente prueba con datos reales).
+- Vistas vista_padron_rt y vista_padron_cs para futura version de Consulta Padron.

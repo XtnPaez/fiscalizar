@@ -64,6 +64,15 @@
                 </li>
             </ul>
 
+            <?php elseif ($_SESSION['rol'] === 'mira'): ?>
+
+            <!-- Mira: solo ve Consulta, sin menu completo -->
+            <ul class="navbar-nav me-auto mb-2 mb-md-0">
+                <li class="nav-item">
+                    <a class="nav-link" href="index.php?mod=consulta">Consulta</a>
+                </li>
+            </ul>
+
             <?php else: ?>
 
             <!-- Admin y superadmin: menu completo -->

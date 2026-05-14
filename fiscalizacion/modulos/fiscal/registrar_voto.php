@@ -41,6 +41,16 @@ if (!in_array($tipo_voto, ['regular', 'observado'])) {
     exit;
 }
 
+// Verificar que la mesa sigue en uso — si el admin la libero, la sesion ya no es valida
+$stmt = $pdo->prepare("SELECT en_uso FROM mesas WHERE id = ?");
+$stmt->execute([$id_mesa]);
+$mesa_estado = $stmt->fetchColumn();
+
+if ($mesa_estado === false || intval($mesa_estado) === 0) {
+    echo json_encode(['error' => 'mesa_liberada']);
+    exit;
+}
+
 // Verificar que la persona no haya votado ya en ninguna mesa de esta eleccion
 // Se cruza por todas las mesas activas del mismo tipo de eleccion
 $stmt = $pdo->prepare("

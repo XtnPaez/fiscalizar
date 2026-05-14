@@ -6,8 +6,9 @@
 //
 // Roles disponibles:
 //   fiscal     — accede solo al modulo fiscal
-//   admin      — accede a dashboard y listados
-//   superadmin — accede a todo lo anterior mas abm_mesas y abm_usuarios
+//   admin      — accede a dashboard, listados, observados, punteo
+//   superadmin — accede a todo lo anterior mas abm_elecciones y abm_usuarios
+//   mira       — accede solo al modulo consulta (su padron + filtro voto + buscador)
 
 // verificar_sesion_fiscal()
 // Si no hay sesion activa redirige al login.
@@ -21,22 +22,33 @@ function verificar_sesion_fiscal() {
 
 // verificar_admin_fiscal()
 // Si el usuario no es admin ni superadmin redirige al dashboard con error.
-// Llamar al inicio de los modulos de administracion.
+// Llamar al inicio de los modulos dashboard, listados, observados, punteo.
 function verificar_admin_fiscal() {
     verificar_sesion_fiscal();
     if (!in_array($_SESSION['rol'], ['admin', 'superadmin'])) {
-        header('Location: index.php?mod=dashboard&error=acceso_denegado');
+        header('Location: index.php?mod=login&error=acceso_denegado');
         exit;
     }
 }
 
 // verificar_superadmin_fiscal()
-// Si el usuario no es superadmin redirige al dashboard con error.
-// Llamar al inicio de los modulos abm_mesas y abm_usuarios.
+// Si el usuario no es superadmin redirige al login con error.
+// Llamar al inicio de los modulos abm_elecciones y abm_usuarios.
 function verificar_superadmin_fiscal() {
     verificar_sesion_fiscal();
     if ($_SESSION['rol'] !== 'superadmin') {
-        header('Location: index.php?mod=dashboard&error=acceso_denegado');
+        header('Location: index.php?mod=login&error=acceso_denegado');
+        exit;
+    }
+}
+
+// verificar_mira_fiscal()
+// Si el usuario no es mira redirige al login con error.
+// Llamar al inicio del modulo consulta.
+function verificar_mira_fiscal() {
+    verificar_sesion_fiscal();
+    if ($_SESSION['rol'] !== 'mira') {
+        header('Location: index.php?mod=login&error=acceso_denegado');
         exit;
     }
 }

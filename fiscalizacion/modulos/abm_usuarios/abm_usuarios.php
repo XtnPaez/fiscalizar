@@ -29,10 +29,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $password = trim($_POST['password'] ?? '');
         $nivel    = $_POST['nivel']         ?? '';
 
-        $niveles_validos = ['admin', 'superadmin'];
+        $niveles_validos = ['admin', 'superadmin', 'mira'];
+        $tipos_validos   = ['cd', 'cp', 'rt', 'cs'];
+
+        // Para nivel mira el tipo es obligatorio
+        $tipo = $_POST['tipo'] ?? '';
+        if ($nivel === 'mira' && !in_array($tipo, $tipos_validos)) {
+            $tipo = null;
+        }
 
         if ($usuario === '' || $password === '' || !in_array($nivel, $niveles_validos)) {
             $mensaje_error = 'Completá todos los campos correctamente.';
+        } elseif ($nivel === 'mira' && !$tipo) {
+            $mensaje_error = 'Para el nivel Mira hay que elegir un tipo de padrón.';
         } else {
             // Verificar que el usuario no exista ya
             $stmt = $pdo->prepare("
@@ -45,9 +54,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $hash = password_hash($password, PASSWORD_BCRYPT);
                 $pdo->prepare("
-                    INSERT INTO usuarios_fiscal (usuario, password, nivel, activo)
-                    VALUES (?, ?, ?, 1)
-                ")->execute([$usuario, $hash, $nivel]);
+                    INSERT INTO usuarios_fiscal (usuario, password, nivel, tipo, activo)
+                    VALUES (?, ?, ?, ?, 1)
+                ")->execute([$usuario, $hash, $nivel, $tipo]);
                 $mensaje_ok = 'Usuario creado correctamente.';
             }
         }
@@ -58,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id_usuario = intval($_POST['id_usuario'] ?? 0);
         $nuevo_nivel = $_POST['nuevo_nivel'] ?? '';
 
-        $niveles_validos = ['admin', 'superadmin'];
+        $niveles_validos = ['admin', 'superadmin', 'mira'];
 
         if ($id_usuario > 0 && in_array($nuevo_nivel, $niveles_validos)) {
             $pdo->prepare("
@@ -116,7 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // ============================================================
 
 $usuarios = $pdo->query("
-    SELECT id, usuario, nivel, activo
+    SELECT id, usuario, nivel, tipo, activo
     FROM usuarios_fiscal
     ORDER BY activo DESC, nivel DESC, usuario ASC
 ")->fetchAll();
@@ -161,10 +170,24 @@ require_once 'includes/navbar.php';
 
     <div class="col-md-2">
         <label class="form-label form-label-sm">Nivel</label>
-        <select name="nivel" class="form-select form-select-sm" required>
+        <select name="nivel" id="combo-nivel" class="form-select form-select-sm" required
+                onchange="toggleTipo(this.value)">
             <option value="">— elegir —</option>
             <option value="admin">admin</option>
             <option value="superadmin">superadmin</option>
+            <option value="mira">mira</option>
+        </select>
+    </div>
+
+    <!-- Combo tipo — solo visible cuando nivel = mira -->
+    <div class="col-md-2" id="div-tipo" style="display:none;">
+        <label class="form-label form-label-sm">Padrón</label>
+        <select name="tipo" class="form-select form-select-sm">
+            <option value="">— elegir —</option>
+            <option value="cd">CD</option>
+            <option value="cp">CP</option>
+            <option value="rt">RT</option>
+            <option value="cs">CS</option>
         </select>
     </div>
 
@@ -172,6 +195,13 @@ require_once 'includes/navbar.php';
         <button type="submit" class="btn btn-sm btn-primary">Crear</button>
     </div>
 </form>
+
+<script>
+function toggleTipo(nivel) {
+    const divTipo = document.getElementById('div-tipo');
+    divTipo.style.display = nivel === 'mira' ? 'block' : 'none';
+}
+</script>
 
 <!-- ============================================================ -->
 <!-- LISTADO DE USUARIOS                                           -->
@@ -202,6 +232,11 @@ require_once 'includes/navbar.php';
                     <span class="badge" style="background-color:#1a1a2e;color:#fff;">
                         <?php echo htmlspecialchars($u['nivel'], ENT_QUOTES, 'UTF-8'); ?>
                     </span>
+                    <?php if ($u['nivel'] === 'mira' && $u['tipo']): ?>
+                        <span class="badge ms-1" style="background-color:#4f8ef7;color:#fff;font-size:0.7rem;">
+                            <?php echo strtoupper($u['tipo']); ?>
+                        </span>
+                    <?php endif; ?>
                 </td>
                 <td>
                     <?php if ($u['activo']): ?>
@@ -274,6 +309,10 @@ require_once 'includes/navbar.php';
                                     <option value="superadmin"
                                         <?php echo $u['nivel'] === 'superadmin' ? 'selected' : ''; ?>>
                                         superadmin
+                                    </option>
+                                    <option value="mira"
+                                        <?php echo $u['nivel'] === 'mira' ? 'selected' : ''; ?>>
+                                        mira
                                     </option>
                                 </select>
                             </div>

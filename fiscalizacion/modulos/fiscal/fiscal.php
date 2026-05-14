@@ -359,13 +359,29 @@ require_once 'includes/navbar.php';
                 }, 2000);
 
             } else {
-                // Error — fondo amarillo, sin frase motivadora
-                msgExito.className   = 'alert text-center fw-semibold';
-                msgExito.style.backgroundColor = '#ffc107';
-                msgExito.style.color           = '#1a1a2e';
-                msgExito.style.border          = 'none';
-                msgExito.innerHTML   = 'Voto no registrado. Avisale al fiscal general.';
-                msgExito.style.display = 'block';
+                if (data.error === 'mesa_liberada') {
+                    // El admin libero la mesa — la sesion ya no es valida.
+                    // Mostrar aviso y redirigir al logout en 3 segundos.
+                    msgExito.className   = 'alert text-center fw-semibold';
+                    msgExito.style.backgroundColor = '#1a1a2e';
+                    msgExito.style.color           = '#fff';
+                    msgExito.style.border          = 'none';
+                    msgExito.innerHTML   = 'Tu mesa fue cerrada por el administrador.<br>' +
+                                          '<span style="font-size:0.85rem;font-weight:400;">Vas a ser redirigido al inicio en unos segundos.</span>';
+                    msgExito.style.display = 'block';
+                    panelVoto.style.display = 'none';
+                    setTimeout(function () {
+                        window.location.href = 'index.php?mod=logout';
+                    }, 3000);
+                } else {
+                    // Error generico — fondo amarillo
+                    msgExito.className   = 'alert text-center fw-semibold';
+                    msgExito.style.backgroundColor = '#ffc107';
+                    msgExito.style.color           = '#1a1a2e';
+                    msgExito.style.border          = 'none';
+                    msgExito.innerHTML   = 'Voto no registrado. Avisale al fiscal general.';
+                    msgExito.style.display = 'block';
+                }
             }
         })
         .catch(function () {

@@ -33,9 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_fiscal'])) {
 
     if ($id_mesa > 0 && $password !== '') {
 
-        // Buscar la mesa con su dia y eleccion
-        // La mesa debe pertenecer a un dia habilitado de una eleccion activa
-        // y no estar en uso
+        // Buscar la mesa con su dia y eleccion.
+        // Filtramos por en_uso = 0: una mesa tomada no es accesible.
+        // Si el fiscal cerro el browser, el admin la libera desde el dashboard.
         $stmt = $pdo->prepare("
             SELECT m.id, m.nombre, m.tipo, m.password, m.activa,
                    d.id AS id_dia,
@@ -90,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_admin'])) {
 
         // Buscar usuario activo en usuarios_fiscal
         $stmt = $pdo->prepare("
-            SELECT id, usuario, password, nivel
+            SELECT id, usuario, password, nivel, tipo
             FROM usuarios_fiscal
             WHERE usuario = ? AND activo = 1
         ");
@@ -99,12 +99,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_admin'])) {
 
         if ($user && password_verify($password, $user['password'])) {
 
-            // Iniciar sesion del admin/superadmin
+            // Iniciar sesion segun nivel
             $_SESSION['rol']     = $user['nivel'];
             $_SESSION['usuario'] = $user['usuario'];
             $_SESSION['id_user'] = $user['id'];
 
-            header('Location: index.php?mod=dashboard');
+            // Nivel mira: guardar el tipo de padron en sesion
+            if ($user['nivel'] === 'mira') {
+                $_SESSION['tipo_mira'] = $user['tipo'];
+                header('Location: index.php?mod=consulta');
+            } else {
+                header('Location: index.php?mod=dashboard');
+            }
             exit;
 
         } else {
@@ -117,7 +123,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_admin'])) {
 }
 
 // --- Cargar mesas disponibles para el combo ---
-// Solo mesas de dias habilitados de elecciones activas, no en uso
+// Solo mesas de dias habilitados de elecciones activas que no esten en uso.
+// Si un fiscal cierra el browser sin logout, la mesa queda en_uso = 1
+// y no aparece en el combo. El admin debe liberarla desde el dashboard
+// para que el fiscal pueda volver a loguearse.
 $stmt_mesas = $pdo->query("
     SELECT m.id, m.nombre, m.tipo, e.nombre AS eleccion
     FROM mesas m

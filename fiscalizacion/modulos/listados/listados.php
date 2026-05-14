@@ -208,6 +208,13 @@ function obtener_listado(PDO $pdo, array $eleccion, array $filtros): array {
         $params[] = $filtros['trabajo'];
     }
 
+    // Voto: valor controlado internamente, no requiere parametro PDO
+    if ($filtros['voto'] === 'SI') {
+        $where[] = "voto_2026 = 'SI'";
+    } elseif ($filtros['voto'] === 'NO') {
+        $where[] = "voto_2026 = 'NO'";
+    }
+
     $clausula_where = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
 
     $stmt = $pdo->prepare("
@@ -244,7 +251,13 @@ $filtros         = [
     'referente' => trim($_GET['referente'] ?? ''),
     'partido'   => trim($_GET['partido']   ?? ''),
     'trabajo'   => trim($_GET['trabajo']   ?? ''),
+    'voto'      => trim($_GET['voto']      ?? ''),
 ];
+
+// Validar voto contra valores permitidos — no viene de PDO sino de literal controlado
+if (!in_array($filtros['voto'], ['', 'SI', 'NO'])) {
+    $filtros['voto'] = '';
+}
 
 if ($id_eleccion_sel > 0) {
     $eleccion_sel = obtener_eleccion($pdo, $id_eleccion_sel);
@@ -442,6 +455,15 @@ require_once 'includes/navbar.php';
             </select>
         </div>
 
+        <div class="col-md-2">
+            <label class="form-label form-label-sm">Voto</label>
+            <select name="voto" class="form-select form-select-sm">
+                <option value=""  <?php echo $filtros['voto'] === ''    ? 'selected' : ''; ?>>Todos</option>
+                <option value="SI" <?php echo $filtros['voto'] === 'SI' ? 'selected' : ''; ?>>SI</option>
+                <option value="NO" <?php echo $filtros['voto'] === 'NO' ? 'selected' : ''; ?>>NO</option>
+            </select>
+        </div>
+
         <div class="col-auto">
             <button type="submit" class="btn btn-sm btn-primary">Filtrar</button>
         </div>
@@ -454,7 +476,7 @@ require_once 'includes/navbar.php';
 
         <!-- Descarga Excel con los mismos filtros activos -->
         <div class="col-auto">
-            <a href="index.php?mod=listados&export=listado&id_eleccion=<?php echo $id_eleccion_sel; ?>&referente=<?php echo urlencode($filtros['referente']); ?>&partido=<?php echo urlencode($filtros['partido']); ?>&trabajo=<?php echo urlencode($filtros['trabajo']); ?>"
+            <a href="index.php?mod=listados&export=listado&id_eleccion=<?php echo $id_eleccion_sel; ?>&referente=<?php echo urlencode($filtros['referente']); ?>&partido=<?php echo urlencode($filtros['partido']); ?>&trabajo=<?php echo urlencode($filtros['trabajo']); ?>&voto=<?php echo urlencode($filtros['voto']); ?>"
                class="btn btn-sm btn-outline-secondary">Descargar Excel</a>
         </div>
 
