@@ -48,7 +48,7 @@ function verificar_superadmin_fiscal() {
 function verificar_mira_fiscal() {
     verificar_sesion_fiscal();
     if ($_SESSION['rol'] !== 'mira') {
-        header('Location: index.php?mod=login&error=acceso_denegado');
+        header('Location: index.php?mod=logout');
         exit;
     }
 }

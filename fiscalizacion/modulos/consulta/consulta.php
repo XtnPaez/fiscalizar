@@ -19,8 +19,8 @@ require_once 'includes/excel.php';
 $tipo = $_SESSION['tipo_mira'] ?? '';
 
 // Validacion defensiva — el tipo debe ser uno de los cuatro validos
-if (!in_array($tipo, ['cd', 'cp', 'rt', 'cs'])) {
-    header('Location: index.php?mod=login');
+if (!in_array($tipo, ['cd', 'cp', 'rt', 'cs', 'cc'])) {
+    header('Location: index.php?mod=logout');
     exit;
 }
 
@@ -30,6 +30,8 @@ $vista = match($tipo) {
     'cp' => 'vista_fiscal_cp',
     'rt' => 'vista_fiscal_rt',
     'cs' => 'vista_fiscal_cs',
+    'cc' => 'vista_fiscal_cc',
+    default => 'vista_fiscal_cd',
 };
 
 // Obtener nombre de la eleccion activa de este tipo
@@ -89,17 +91,24 @@ function obtener_resultado(PDO $pdo, string $vista, string $q, string $voto): ar
     }
 
     // Filtro voto: valor controlado internamente
+    // COLLATE explicito para evitar error 1267 en vista_fiscal_cc
+    // que mezcla collations entre padron_cc y otras tablas
     if ($voto === 'SI') {
-        $where[] = "voto_2026 = 'SI'";
+        $where[] = "voto_2026 COLLATE utf8mb4_unicode_ci = 'SI'";
     } elseif ($voto === 'NO') {
-        $where[] = "voto_2026 = 'NO'";
+        $where[] = "voto_2026 COLLATE utf8mb4_unicode_ci = 'NO'";
     }
 
     $clausula_where = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
 
+    // Envolver en subquery para evitar problemas de MariaDB al filtrar
+    // por columnas calculadas (CASE WHEN) usando WHERE sobre alias de vista
     $stmt = $pdo->prepare("
         SELECT dni, apellido, nombre, voto_2026
-        FROM $vista
+        FROM (
+            SELECT dni, apellido, nombre, voto_2026
+            FROM $vista
+        ) AS sub
         $clausula_where
         ORDER BY apellido ASC, nombre ASC
     ");

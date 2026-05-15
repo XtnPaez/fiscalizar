@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $nivel    = $_POST['nivel']         ?? '';
 
         $niveles_validos = ['admin', 'superadmin', 'mira'];
-        $tipos_validos   = ['cd', 'cp', 'rt', 'cs'];
+        $tipos_validos   = ['cd', 'cp', 'rt', 'cs', 'cc'];
 
         // Para nivel mira el tipo es obligatorio
         $tipo = $_POST['tipo'] ?? '';
@@ -188,6 +188,7 @@ require_once 'includes/navbar.php';
             <option value="cp">CP</option>
             <option value="rt">RT</option>
             <option value="cs">CS</option>
+            <option value="cc">CC</option>
         </select>
     </div>
 

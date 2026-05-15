@@ -38,6 +38,7 @@ $tabla = match($tipo) {
     'cp' => 'padron_cp',
     'rt' => 'padron_rt',
     'cs' => 'padron_cs',
+    'cc' => 'padron_cc',
     default => null
 };
 

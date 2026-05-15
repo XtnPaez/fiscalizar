@@ -137,6 +137,21 @@ function buscar_en_padrones(PDO $pdo, string $q): array {
         JOIN elecciones e ON e.tipo = 'cs' AND e.estado = 'activa'
         WHERE $campo
 
+        UNION ALL
+
+        SELECT
+            (SELECT nombre FROM elecciones
+             WHERE tipo = 'cc' AND estado = 'activa' LIMIT 1) AS eleccion,
+            p.dni, p.apellido, p.nombre,
+            CASE WHEN EXISTS (
+                SELECT 1 FROM votos_dia v
+                WHERE v.dni = p.dni AND v.id_mesa IN ($sub_mesas)
+            ) THEN 'SI' ELSE 'NO' END AS voto_2026
+        FROM padron_cc t
+        JOIN personas p   ON t.dni = p.dni
+        JOIN elecciones e ON e.tipo = 'cc' AND e.estado = 'activa'
+        WHERE $campo
+
         ORDER BY apellido, nombre, eleccion
     ";
 
@@ -146,6 +161,7 @@ function buscar_en_padrones(PDO $pdo, string $q): array {
         'cp', $param,
         'rt', $param,
         'cs', $param,
+        'cc', $param,
     ]);
     return $stmt->fetchAll();
 }
@@ -175,6 +191,7 @@ function obtener_listado(PDO $pdo, array $eleccion, array $filtros): array {
         'cp' => 'vista_fiscal_cp',
         'rt' => 'vista_fiscal_rt',
         'cs' => 'vista_fiscal_cs',
+        'cc' => 'vista_fiscal_cc',
         default => null
     };
 
