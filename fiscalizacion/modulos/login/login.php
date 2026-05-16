@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_fiscal'])) {
         // Filtramos por en_uso = 0: una mesa tomada no es accesible.
         // Si el fiscal cerro el browser, el admin la libera desde el dashboard.
         $stmt = $pdo->prepare("
-            SELECT m.id, m.nombre, m.tipo, m.password, m.activa, m.en_uso,
+            SELECT m.id, m.nombre, m.tipo, m.password, m.activa,
                    d.id AS id_dia,
                    e.id AS id_eleccion
             FROM mesas m
@@ -46,6 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_fiscal'])) {
             WHERE m.id = ?
               AND d.habilitado = 1
               AND e.estado = 'activa'
+              AND m.en_uso = 0
+              AND m.activa = 1
         ");
         $stmt->execute([$id_mesa]);
         $mesa = $stmt->fetch();
@@ -55,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_fiscal'])) {
             if (!$mesa['activa']) {
                 $error_fiscal = 'La mesa no esta activa para recibir votos.';
             } else {
-                // Marcar mesa en uso (puede ya estar en 1 si el fiscal se reconecta)
+                // Marcar mesa en uso
                 $pdo->prepare("UPDATE mesas SET en_uso = 1 WHERE id = ?")
                     ->execute([$mesa['id']]);
 
@@ -120,18 +122,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_admin'])) {
         $error_admin = 'Ingresar usuario y password.';
     }
 }
+
 // --- Cargar mesas disponibles para el combo ---
 // Solo mesas de dias habilitados de elecciones activas que no esten en uso.
 // Si un fiscal cierra el browser sin logout, la mesa queda en_uso = 1
 // y no aparece en el combo. El admin debe liberarla desde el dashboard
 // para que el fiscal pueda volver a loguearse.
 $stmt_mesas = $pdo->query("
-    SELECT m.id, m.nombre, m.tipo, m.en_uso, e.nombre AS eleccion
+    SELECT m.id, m.nombre, m.tipo, e.nombre AS eleccion
     FROM mesas m
     JOIN dias_eleccion d ON m.id_dia = d.id
     JOIN elecciones e    ON d.id_eleccion = e.id
     WHERE d.habilitado = 1
       AND e.estado = 'activa'
+      AND m.en_uso = 0
+      AND m.activa = 1
     ORDER BY m.tipo, m.nombre
 ");
 $mesas_disponibles = $stmt_mesas->fetchAll();
@@ -228,7 +233,6 @@ $mesas_disponibles = $stmt_mesas->fetchAll();
                                     <option value="<?php echo $m['id']; ?>">
                                         <?php echo htmlspecialchars($m['nombre'], ENT_QUOTES, 'UTF-8'); ?>
                                         — <?php echo htmlspecialchars($m['eleccion'], ENT_QUOTES, 'UTF-8'); ?>
-                                        <?php echo $m['en_uso'] ? '(en uso — reconectar)' : ''; ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>

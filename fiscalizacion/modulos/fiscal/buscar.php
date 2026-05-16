@@ -57,7 +57,7 @@ $subquery_mesas = "
     SELECT m.id FROM mesas m
     JOIN dias_eleccion d ON m.id_dia = d.id
     JOIN elecciones e    ON d.id_eleccion = e.id
-    WHERE e.tipo = ? AND e.estado = 'activa'
+    WHERE e.tipo = ? AND e.estado = 'activa' AND m.activa = 1
 ";
 
 // Detectar si es busqueda por DNI (solo numeros) o por apellido

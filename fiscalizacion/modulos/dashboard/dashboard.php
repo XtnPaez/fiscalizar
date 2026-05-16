@@ -36,6 +36,8 @@ if ($_SESSION['rol'] === 'superadmin') {
         JOIN dias_eleccion d  ON m.id_dia = d.id
         JOIN elecciones e     ON d.id_eleccion = e.id
         WHERE e.estado = 'activa'
+          AND d.habilitado = 1
+          AND m.activa = 1
         ORDER BY e.tipo ASC, d.id ASC, m.nombre ASC
     ");
     $mesas = $stmt_mesas->fetchAll();

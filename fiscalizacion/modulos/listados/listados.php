@@ -75,7 +75,7 @@ function buscar_en_padrones(PDO $pdo, string $q): array {
         SELECT m.id FROM mesas m
         JOIN dias_eleccion d ON m.id_dia = d.id
         JOIN elecciones ex   ON d.id_eleccion = ex.id
-        WHERE ex.tipo = ? AND ex.estado = 'activa'
+        WHERE ex.tipo = ? AND ex.estado = 'activa' AND m.activa = 1
     ";
 
     $sql = "

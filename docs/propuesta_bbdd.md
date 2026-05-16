@@ -1,19 +1,18 @@
 # Propuesta de nueva base de datos
 
 **Proyecto:** Fiscalizar
-**Fecha:** Junio 2026 (actualizado)
-**Etapa:** Esquema productivo — version activa
+**Fecha:** Junio 2026 (version final)
+**Etapa:** Esquema productivo activo
 
 ---
 
-## 1. Principios que guian este diseno
+## 1. Principios
 
 - DNI como clave unica de cruce entre todas las tablas.
-- Todo InnoDB, todo utf8mb4. Integridad referencial garantizada por el motor.
+- Todo InnoDB, todo utf8mb4. Integridad referencial por el motor.
 - La logica vive en las vistas. El PHP hace SELECT contra vistas predefinidas.
-- Los padrones se mantienen puros. Se cargan tal como los entrega la facultad.
+- Los padrones se mantienen puros. Sin modificaciones al cargar.
 - Padrones acumulativos. Nunca se elimina un registro.
-- Escalabilidad hacia Fiscalizacion. Incorporado sin cambios en Consulta Padron.
 
 ---
 
@@ -36,7 +35,7 @@ RELACIONES
 AUTENTICACION CONSULTA PADRON
     usuarios
 
-TABLAS ADICIONALES (cruce por DNI)
+TABLAS ADICIONALES
     st_siet_2026 / st_ucr_caba_2026 / st_ucr_pba_2024
 
 TABLAS FISCALIZACION
@@ -51,52 +50,25 @@ VISTAS FISCALIZACION
 
 ---
 
-## 3. Tablas productivas
+## 3. Tablas productivas principales
 
 ### `personas`
-Un registro por DNI. Nunca se elimina. PK: dni.
+22.478 registros. Un registro por DNI. Nunca se elimina.
 
-### `padron_cd`
-Padron oficial CD. Acumulativo. Sigla reconstruida via st_dni_carrera en 2026.
-21.745 registros.
+### Padrones
 
-### `padron_cp`
-Padron oficial CP. Campo auxiliar marcado durante el tuneo.
-4.843 registros. 175 auxiliares.
-
-### `padron_rt`
-Padron oficial RT. Solo modulo Fiscalizacion.
-5.240 registros. 118 auxiliares en tabla auxiliares (id_carrera=3).
-
-### `padron_cs`
-Padron oficial CS. Solo modulo Fiscalizacion.
-4.829 registros. 161 auxiliares en tabla auxiliares (id_carrera=1).
-
-### `padron_cc`
-Padron oficial CC. Agregado junio 2026. Solo modulo Fiscalizacion.
-4.504 registros. 153 auxiliares en tabla auxiliares (id_carrera=5).
-Los 153 auxiliares no estaban en personas — se insertaron al crear la tabla.
-
-| Campo | Tipo |
-|---|---|
-| id | BIGINT UNSIGNED PK AUTO_INCREMENT |
-| dni | INT UNSIGNED FK personas |
-| apellido | VARCHAR(120) |
-| nombre | VARCHAR(120) |
+| Tabla | Registros | Auxiliares | Notas |
+|---|---|---|---|
+| padron_cd | 21.745 | — | Sigla reconstruida 2026 |
+| padron_cp | 4.843 | 175 (campo directo) | |
+| padron_rt | 5.240 | 118 (auxiliares id_carrera=3) | |
+| padron_cs | 4.829 | 161 (auxiliares id_carrera=1) | |
+| padron_cc | 4.504 | 153 (auxiliares id_carrera=5) | Agregado junio 2026 |
 
 ### `auxiliares`
-PK compuesta (dni, id_carrera).
-
-| Carrera | id_carrera | Auxiliares |
-|---|---|---|
-| Sociologia (CS) | 1 | 161 |
-| Ciencia Politica (CP) | 2 | 175 |
-| Relaciones del Trabajo (RT) | 3 | 118 |
-| Ciencias de la Comunicacion (CC) | 5 | 153 |
-| **Total** | | **607** |
+607 registros totales. PK compuesta (dni, id_carrera).
 
 ### `carreras`
-Sin AUTO_INCREMENT. ids con significado propio.
 
 | id | sigla | descripcion |
 |---|---|---|
@@ -128,13 +100,7 @@ Sin AUTO_INCREMENT. ids con significado propio.
 | 6 | Eleccion CP 2024 | cp | 2024 | cerrada |
 | 7 | Eleccion RT 2026 | rt | 2026 | programada |
 | 8 | Eleccion CS 2026 | cs | 2026 | programada |
-| 9+ | Elecciones CD/CC 2026 | cd/cc | 2026 | programada/activa |
-
-### `participacion_electoral`
-Historial de participacion. Solo se registran los que votaron.
-
-### `usuarios`
-Usuarios de Consulta Padron. Independiente de usuarios_fiscal.
+| 9+ | Elecciones 2026 | cd/cc/... | 2026 | variable |
 
 ---
 
@@ -149,6 +115,8 @@ Usuarios de Consulta Padron. Independiente de usuarios_fiscal.
 | nombre | VARCHAR(30) |
 | habilitado | TINYINT(1) DEFAULT 0 |
 
+La habilitacion a nivel dia controla que mesas aparecen en el login del fiscal.
+
 ### `mesas`
 
 | Campo | Tipo |
@@ -161,7 +129,12 @@ Usuarios de Consulta Padron. Independiente de usuarios_fiscal.
 | en_uso | TINYINT(1) DEFAULT 0 |
 | activa | TINYINT(1) DEFAULT 1 |
 
-Nota: campo habilitada existe pero deprecado.
+`activa` = habilitacion individual de la mesa independiente del dia.
+`habilitada` = campo deprecado, ignorado en toda la logica.
+
+El login filtra: d.habilitado=1 AND m.activa=1 AND m.en_uso=0 AND e.estado='activa'.
+El dashboard muestra: d.habilitado=1 AND m.activa=1 AND e.estado='activa'.
+El conteo de votos en dashboard: todos los dias de la eleccion activa (sin filtro de dia).
 
 ### `votos_dia`
 
@@ -193,12 +166,12 @@ La eleccion se obtiene via id_mesa -> dias_eleccion -> elecciones.
 |---|---|
 | id | INT PK AUTO_INCREMENT |
 | id_mesa | INT FK mesas |
-| numero_corte | INT — MAX+1 por mesa |
+| numero_corte | INT |
 | votantes | INT DEFAULT 20 |
 | faltantes | INT DEFAULT 0 |
 | timestamp | DATETIME DEFAULT CURRENT_TIMESTAMP |
 
-UNIQUE KEY (id_mesa, numero_corte).
+UNIQUE KEY (id_mesa, numero_corte). Numero asignado automaticamente (MAX+1).
 
 ---
 
@@ -206,21 +179,20 @@ UNIQUE KEY (id_mesa, numero_corte).
 
 ### Consulta Padron
 vista_padron_cd y vista_padron_cp — perfil completo con historial electoral.
+No modificadas por Fiscalizacion.
 
 ### Fiscalizacion
-Cinco vistas con VOTO_2026 desde votos_dia via EXISTS + subquery.
 
-| Vista | Fuente | Auxiliar |
-|---|---|---|
-| vista_fiscal_cd | padron_cd | No aplica — todos son graduados CD |
-| vista_fiscal_cp | padron_cp | padron_cp.auxiliar (campo directo) |
-| vista_fiscal_rt | padron_rt | auxiliares id_carrera=3 |
-| vista_fiscal_cs | padron_cs | auxiliares id_carrera=1 |
-| vista_fiscal_cc | padron_cc | auxiliares id_carrera=5 |
+| Vista | Fuente | Auxiliar | VOTO_2026 |
+|---|---|---|---|
+| vista_fiscal_cd | padron_cd | No aplica | EXISTS sobre mesas activas tipo cd |
+| vista_fiscal_cp | padron_cp | padron_cp.auxiliar | EXISTS sobre mesas activas tipo cp |
+| vista_fiscal_rt | padron_rt | auxiliares id_carrera=3 | EXISTS sobre mesas activas tipo rt |
+| vista_fiscal_cs | padron_cs | auxiliares id_carrera=1 | EXISTS sobre mesas activas tipo cs |
+| vista_fiscal_cc | padron_cc | auxiliares id_carrera=5 | EXISTS sobre mesas activas tipo cc |
 
-**Nota de collation:** vista_fiscal_cc puede generar error 1267 al filtrar por
-voto_2026 en PHP. Se resuelve con COLLATE utf8mb4_unicode_ci en el WHERE.
-Pendiente: recrear la vista con COLLATE explicito para eliminar el workaround.
+Todas filtran por m.activa=1 en el subquery de votos.
+vista_fiscal_cc: workaround COLLATE utf8mb4_unicode_ci en PHP al filtrar voto_2026.
 
 ---
 
@@ -230,7 +202,8 @@ Pendiente: recrear la vista con COLLATE explicito para eliminar el workaround.
 personas ──── padron_cd/cp/rt/cs/cc
 personas ──── auxiliares / referentes_graduado
 personas ──── persona_partido/trabajo/sede/municipio
-personas ──── participacion_electoral / votos_dia (via mesas)
+personas ──── participacion_electoral
+personas ──── votos_dia (via mesas -> dias_eleccion -> elecciones)
 
 carreras ──── auxiliares
 elecciones ── participacion_electoral / dias_eleccion
@@ -244,13 +217,13 @@ mesas ────── votos_dia / punteo
 
 | Tabla | Registros | Estado |
 |---|---|---|
-| personas | 22.478 | ✅ Junio 2026 (+153 de CC) |
+| personas | 22.478 | ✅ Junio 2026 |
 | padron_cd | 21.745 | ✅ Mayo 2026 |
 | padron_cp | 4.843 | ✅ Mayo 2026 |
 | padron_rt | 5.240 | ✅ Mayo 2026 |
 | padron_cs | 4.829 | ✅ Mayo 2026 |
 | padron_cc | 4.504 | ✅ Junio 2026 |
-| auxiliares | 607 | ✅ Junio 2026 (+153 CC) |
+| auxiliares | 607 | ✅ Junio 2026 |
 | carreras | 7 | ✅ |
 | referentes | 324 | ✅ Mayo 2026 |
 | partidos | 87 | ✅ Mayo 2026 |
@@ -258,7 +231,7 @@ mesas ────── votos_dia / punteo
 | sedes | 50 | ✅ |
 | municipios | 84 | ✅ |
 | elecciones | 9+ | ✅ Junio 2026 |
-| referentes_graduado | 22.325 | ✅ Mayo 2026 + correccion junio 2026 |
+| referentes_graduado | 22.325 | ✅ Correccion junio 2026 |
 | persona_partido | 1.560 | ✅ |
 | persona_trabajo | 2.150 | ✅ |
 | persona_sede | 19.709 | ✅ |
@@ -268,17 +241,18 @@ mesas ────── votos_dia / punteo
 | dias_eleccion | variable | ⏳ Se crea desde la interfaz |
 | mesas | variable | ⏳ Se crea desde la interfaz |
 | votos_dia | 0 | ⏳ Dia de la eleccion |
-| usuarios_fiscal | 6+ | ✅ Superadmin + usuarios mira (cd/cp/rt/cs/cc) |
+| usuarios_fiscal | variable | ✅ Superadmin + mira creados |
 | punteo | 0 | ⏳ Dia de la eleccion |
 
 ---
 
 ## 8. Nota de collation
 
-config/db.php de ambos modulos debe incluir:
-
+config/db.php debe incluir:
 ```php
 $pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
 ```
 
-vista_fiscal_cc: usar COLLATE utf8mb4_unicode_ci en WHERE voto_2026 desde PHP.
+vista_fiscal_cc: error 1267 al filtrar por voto_2026 desde PHP.
+Workaround activo en consulta.php: COLLATE utf8mb4_unicode_ci en el WHERE.
+Pendiente: recrear la vista con COLLATE explicito en todos los campos calculados.

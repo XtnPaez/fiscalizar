@@ -232,6 +232,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // Habilitar mesa individualmente: activa = 1
+    if ($accion === 'habilitar_mesa') {
+        $id_mesa     = intval($_POST['id_mesa']     ?? 0);
+        $id_dia      = intval($_POST['id_dia']      ?? 0);
+        $id_eleccion = intval($_POST['id_eleccion'] ?? 0);
+
+        if ($id_mesa > 0) {
+            $pdo->prepare("UPDATE mesas SET activa = 1 WHERE id = ?")
+                ->execute([$id_mesa]);
+        }
+        header('Location: index.php?mod=abm_elecciones&pestana=mesas&id_dia=' . $id_dia . '&id_eleccion=' . $id_eleccion . '&ok=mesa_habilitada');
+        exit;
+    }
+
+    // Deshabilitar mesa individualmente: activa = 0
+    // Si estaba en uso tambien la libera
+    if ($accion === 'deshabilitar_mesa') {
+        $id_mesa     = intval($_POST['id_mesa']     ?? 0);
+        $id_dia      = intval($_POST['id_dia']      ?? 0);
+        $id_eleccion = intval($_POST['id_eleccion'] ?? 0);
+
+        if ($id_mesa > 0) {
+            $pdo->prepare("UPDATE mesas SET activa = 0, en_uso = 0 WHERE id = ?")
+                ->execute([$id_mesa]);
+        }
+        header('Location: index.php?mod=abm_elecciones&pestana=mesas&id_dia=' . $id_dia . '&id_eleccion=' . $id_eleccion . '&ok=mesa_deshabilitada');
+        exit;
+    }
+
+    // Eliminar mesa: solo si no tiene votos y no esta en uso
+    if ($accion === 'eliminar_mesa') {
+        $id_mesa     = intval($_POST['id_mesa']     ?? 0);
+        $id_dia      = intval($_POST['id_dia']      ?? 0);
+        $id_eleccion = intval($_POST['id_eleccion'] ?? 0);
+
+        if ($id_mesa > 0) {
+            // Verificar que no tenga votos ni este en uso
+            $stmt = $pdo->prepare("
+                SELECT en_uso,
+                    (SELECT COUNT(*) FROM votos_dia WHERE id_mesa = ?) AS total_votos
+                FROM mesas WHERE id = ?
+            ");
+            $stmt->execute([$id_mesa, $id_mesa]);
+            $estado = $stmt->fetch();
+
+            if ($estado['en_uso']) {
+                header('Location: index.php?mod=abm_elecciones&pestana=mesas&id_dia=' . $id_dia . '&id_eleccion=' . $id_eleccion . '&error=mesa_en_uso');
+            } elseif ($estado['total_votos'] > 0) {
+                header('Location: index.php?mod=abm_elecciones&pestana=mesas&id_dia=' . $id_dia . '&id_eleccion=' . $id_eleccion . '&error=mesa_con_votos');
+            } else {
+                $pdo->prepare("DELETE FROM mesas WHERE id = ?")
+                    ->execute([$id_mesa]);
+                header('Location: index.php?mod=abm_elecciones&pestana=mesas&id_dia=' . $id_dia . '&id_eleccion=' . $id_eleccion . '&ok=mesa_eliminada');
+            }
+        }
+        exit;
+    }
+
     // Liberar mesa caida: pone en_uso = 0 para que el fiscal pueda reloguearse
     if ($accion === 'liberar_mesa') {
         $id_mesa     = intval($_POST['id_mesa'] ?? 0);
@@ -303,6 +361,9 @@ $mensajes_ok = [
     'dia_habilitado'       => 'Dia habilitado. Los fiscales ya pueden ver sus mesas.',
     'dia_deshabilitado'    => 'Dia deshabilitado. Las mesas quedaron liberadas.',
     'mesa_creada'          => 'Mesa creada correctamente.',
+    'mesa_habilitada'      => 'Mesa habilitada.',
+    'mesa_deshabilitada'   => 'Mesa deshabilitada. El fiscal fue desconectado si estaba en uso.',
+    'mesa_eliminada'       => 'Mesa eliminada correctamente.',
     'mesa_liberada'        => 'Mesa liberada. El fiscal puede volver a loguearse.',
     'nombre_actualizado'   => 'Nombre de la mesa actualizado.',
     'password_cambiado'    => 'Password de la mesa actualizado.',
@@ -312,6 +373,8 @@ $mensajes_error = [
     'ya_hay_activa'            => 'Ya hay una eleccion activa de ese tipo. Desactivala antes de activar esta.',
     'hay_dias_habilitados'     => 'Hay dias habilitados en esta eleccion. Deshabilitatelos antes de continuar.',
     'eleccion_no_encontrada'   => 'No se encontro la eleccion.',
+    'mesa_en_uso'              => 'No se puede eliminar una mesa en uso. Liberala primero.',
+    'mesa_con_votos'           => 'No se puede eliminar una mesa que tiene votos registrados.',
 ];
 
 // --- Pestana 1: todas las elecciones ---
@@ -365,10 +428,11 @@ if ($id_dia > 0) {
     }
 
     $stmt = $pdo->prepare("
-        SELECT id, nombre, tipo, en_uso, activa
-        FROM mesas
-        WHERE id_dia = ?
-        ORDER BY nombre ASC
+        SELECT m.id, m.nombre, m.tipo, m.en_uso, m.activa,
+               (SELECT COUNT(*) FROM votos_dia WHERE id_mesa = m.id) AS total_votos
+        FROM mesas m
+        WHERE m.id_dia = ?
+        ORDER BY m.nombre ASC
     ");
     $stmt->execute([$id_dia]);
     $mesas = $stmt->fetchAll();
@@ -857,6 +921,27 @@ require_once 'includes/navbar.php';
                         </form>
                         <?php endif; ?>
 
+                        <!-- Habilitar / Deshabilitar mesa individual -->
+                        <?php if (!$m['activa']): ?>
+                        <form method="POST" action="index.php?mod=abm_elecciones"
+                              onsubmit="return confirm('Habilitar la mesa <?php echo htmlspecialchars($m['nombre'], ENT_QUOTES, 'UTF-8'); ?>?');">
+                            <input type="hidden" name="accion" value="habilitar_mesa">
+                            <input type="hidden" name="id_mesa" value="<?php echo $m['id']; ?>">
+                            <input type="hidden" name="id_dia" value="<?php echo $id_dia; ?>">
+                            <input type="hidden" name="id_eleccion" value="<?php echo $id_eleccion; ?>">
+                            <button type="submit" class="btn btn-sm btn-success">Habilitar</button>
+                        </form>
+                        <?php else: ?>
+                        <form method="POST" action="index.php?mod=abm_elecciones"
+                              onsubmit="return confirm('Deshabilitar la mesa <?php echo htmlspecialchars($m['nombre'], ENT_QUOTES, 'UTF-8'); ?>? Si hay un fiscal activo sera desconectado.');">
+                            <input type="hidden" name="accion" value="deshabilitar_mesa">
+                            <input type="hidden" name="id_mesa" value="<?php echo $m['id']; ?>">
+                            <input type="hidden" name="id_dia" value="<?php echo $id_dia; ?>">
+                            <input type="hidden" name="id_eleccion" value="<?php echo $id_eleccion; ?>">
+                            <button type="submit" class="btn btn-sm btn-warning">Deshabilitar</button>
+                        </form>
+                        <?php endif; ?>
+
                         <!-- Editar nombre: modal inline -->
                         <button type="button" class="btn btn-sm btn-outline-secondary"
                                 data-bs-toggle="modal"
@@ -870,6 +955,23 @@ require_once 'includes/navbar.php';
                                 data-bs-target="#modalPassword<?php echo $m['id']; ?>">
                             Password
                         </button>
+
+                        <!-- Eliminar mesa: solo si no tiene votos ni esta en uso -->
+                        <?php if (!$m['en_uso'] && $m['total_votos'] == 0): ?>
+                        <form method="POST" action="index.php?mod=abm_elecciones"
+                              onsubmit="return confirm('Eliminar la mesa <?php echo htmlspecialchars($m['nombre'], ENT_QUOTES, 'UTF-8'); ?>? Esta accion no se puede deshacer.');">
+                            <input type="hidden" name="accion" value="eliminar_mesa">
+                            <input type="hidden" name="id_mesa" value="<?php echo $m['id']; ?>">
+                            <input type="hidden" name="id_dia" value="<?php echo $id_dia; ?>">
+                            <input type="hidden" name="id_eleccion" value="<?php echo $id_eleccion; ?>">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Eliminar</button>
+                        </form>
+                        <?php elseif ($m['total_votos'] > 0): ?>
+                        <span class="text-secondary" style="font-size:0.8rem;"
+                              title="Tiene <?php echo $m['total_votos']; ?> votos registrados">
+                            No eliminable
+                        </span>
+                        <?php endif; ?>
 
                     </div>
                 </td>
