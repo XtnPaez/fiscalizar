@@ -98,6 +98,11 @@
                     <a class="nav-link" href="index.php?mod=punteo">Punteo</a>
                 </li>
 
+                <!-- Cortes: admin y superadmin -->
+                <li class="nav-item">
+                    <a class="nav-link" href="index.php?mod=cortes">Cortes</a>
+                </li>
+
                 <?php if ($_SESSION['rol'] === 'superadmin'): ?>
 
                 <!-- Administracion: solo superadmin -->
