@@ -47,6 +47,7 @@ if ($export === 'listado') {
                 'referente' => trim($_GET['referente'] ?? ''),
                 'partido'   => trim($_GET['partido']   ?? ''),
                 'trabajo'   => trim($_GET['trabajo']   ?? ''),
+                 'voto'      => trim($_GET['voto']      ?? ''),
             ];
             exportar_excel(
                 obtener_listado($pdo, $eleccion_export, $filtros_export),
