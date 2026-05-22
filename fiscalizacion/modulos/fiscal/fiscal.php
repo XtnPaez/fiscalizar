@@ -360,26 +360,53 @@ require_once 'includes/navbar.php';
 
             } else {
                 if (data.error === 'mesa_liberada') {
-                    // El admin libero la mesa — la sesion ya no es valida.
-                    // Mostrar aviso y redirigir al logout en 3 segundos.
+                    // El admin libero la mesa.
+                    // Aviso claro con boton manual — sin redirect automatico
+                    // para que el fiscal pueda leer el mensaje y decidir.
+                    panelVoto.style.display = 'none';
                     msgExito.className   = 'alert text-center fw-semibold';
                     msgExito.style.backgroundColor = '#1a1a2e';
                     msgExito.style.color           = '#fff';
                     msgExito.style.border          = 'none';
-                    msgExito.innerHTML   = 'Tu mesa fue cerrada por el administrador.<br>' +
-                                          '<span style="font-size:0.85rem;font-weight:400;">Vas a ser redirigido al inicio en unos segundos.</span>';
+                    msgExito.innerHTML   =
+                        '⚠️ Tu mesa fue cerrada por el administrador.<br>' +
+                        '<span style="font-size:0.85rem;font-weight:400;">El voto NO fue registrado.</span><br><br>' +
+                        '<button onclick="window.location.href=\'index.php?mod=login\'" ' +
+                        'style="background:#fff;color:#1a1a2e;border:none;padding:0.4rem 1rem;' +
+                        'border-radius:4px;font-weight:600;cursor:pointer;">Volver al login</button>';
                     msgExito.style.display = 'block';
+
+                } else if (data.error === 'voto_no_insertado') {
+                    // El INSERT no afecto ninguna fila — voto perdido silenciosamente.
+                    // Mostrar DNI para que el fiscal lo anote y avise al fiscal general.
+                    // No se cierra automaticamente — requiere accion manual.
+                    const dniError = data.dni || '—';
                     panelVoto.style.display = 'none';
-                    setTimeout(function () {
-                        window.location.href = 'index.php?mod=logout';
-                    }, 3000);
+                    msgExito.className   = 'alert text-center fw-semibold';
+                    msgExito.style.backgroundColor = '#dc3545';
+                    msgExito.style.color           = '#fff';
+                    msgExito.style.border          = 'none';
+                    msgExito.innerHTML   =
+                        '❌ Voto NO registrado.<br>' +
+                        '<span style="font-size:1rem;">DNI: <strong>' + escHtml(String(dniError)) + '</strong></span><br>' +
+                        '<span style="font-size:0.85rem;font-weight:400;">Anotá el DNI y avisale al fiscal general.</span><br><br>' +
+                        '<button onclick="document.getElementById(\'msg-exito\').style.display=\'none\';" ' +
+                        'style="background:#fff;color:#dc3545;border:none;padding:0.4rem 1rem;' +
+                        'border-radius:4px;font-weight:600;cursor:pointer;">Cerrar y continuar</button>';
+                    msgExito.style.display = 'block';
+
                 } else {
-                    // Error generico — fondo amarillo
+                    // Error generico (ya voto, no esta en padron, etc.) — fondo amarillo
+                    // No se cierra automaticamente.
                     msgExito.className   = 'alert text-center fw-semibold';
                     msgExito.style.backgroundColor = '#ffc107';
                     msgExito.style.color           = '#1a1a2e';
                     msgExito.style.border          = 'none';
-                    msgExito.innerHTML   = 'Voto no registrado. Avisale al fiscal general.';
+                    msgExito.innerHTML   =
+                        (data.error || 'Voto no registrado. Avisale al fiscal general.') +
+                        '<br><br><button onclick="document.getElementById(\'msg-exito\').style.display=\'none\';" ' +
+                        'style="background:#1a1a2e;color:#fff;border:none;padding:0.4rem 1rem;' +
+                        'border-radius:4px;font-weight:600;cursor:pointer;">Cerrar</button>';
                     msgExito.style.display = 'block';
                 }
             }
@@ -445,7 +472,28 @@ require_once 'includes/navbar.php';
         'La mesa sigue impecable.',
         'Excelente ritmo electoral.',
         'Orden, control y democracia.',
-        'Voto registrado, próxima misión.'
+        'Voto registrado, próxima misión.',
+        // 20 mensajes nuevos
+        'El padrón te saluda, crack.',
+        'Urna feliz, fiscal feliz.',
+        'Voto a salvo, gracias a vos.',
+        'Sin vos no hay democracia.',
+        'Impecable como siempre.',
+        'La transparencia tiene tu cara.',
+        'Anotado, guardado, perfecto.',
+        'Nadie fiscaliza como vos.',
+        'El sistema confía en vos.',
+        'Otro voto, otro escudo democrático.',
+        'La historia te va a recordar, fiscal.',
+        'Voto cerrado, urna contenta.',
+        'Sos parte de algo importante.',
+        'Cada registro es un acto de fe.',
+        'La democracia no se toma descanso, ni vos.',
+        'Sigue así, la mesa te necesita.',
+        'Registro como los dioses.',
+        'Nadie para la máquina democrática.',
+        'Un voto más en el bolsillo ciudadano.',
+        'Fiscalizando a pleno, como siempre.'
     ];
 
     function mensajeAleatorio() {

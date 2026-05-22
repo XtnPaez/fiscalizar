@@ -100,8 +100,17 @@ try {
         VALUES (?, ?, ?)
     ");
     $stmt->execute([$dni, $id_mesa, $tipo_voto]);
-    echo json_encode(['ok' => true]);
+
+    // Verificar que realmente se inserto la fila
+    // rowCount() = 0 significa que el INSERT no afecto ninguna fila
+    // aunque no haya tirado excepcion (ej: UNIQUE KEY silencioso)
+    if ($stmt->rowCount() > 0) {
+        echo json_encode(['ok' => true]);
+    } else {
+        echo json_encode(['error' => 'voto_no_insertado', 'dni' => $dni]);
+    }
+
 } catch (Exception $e) {
     // Puede dispararse por concurrencia si dos mesas registran el mismo DNI
-    echo json_encode(['error' => 'No se pudo registrar el voto. Intenta de nuevo.']);
+    echo json_encode(['error' => 'voto_no_insertado', 'dni' => $dni]);
 }
