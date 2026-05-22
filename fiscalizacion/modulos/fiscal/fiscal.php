@@ -368,9 +368,11 @@ require_once 'includes/navbar.php';
                     msgExito.style.backgroundColor = '#1a1a2e';
                     msgExito.style.color           = '#fff';
                     msgExito.style.border          = 'none';
+                    const dniPendiente = personaSeleccionada ? personaSeleccionada.dni : '—';
                     msgExito.innerHTML   =
                         '⚠️ Tu mesa fue cerrada por el administrador.<br>' +
-                        '<span style="font-size:0.85rem;font-weight:400;">El voto NO fue registrado.</span><br><br>' +
+                        '<span style="font-size:1rem;">DNI: <strong>' + escHtml(String(dniPendiente)) + '</strong></span><br>' +
+                        '<span style="font-size:0.85rem;font-weight:400;">El voto NO fue registrado. Anotá el DNI y avisale al fiscal general.</span><br><br>' +
                         '<button onclick="window.location.href=\'index.php?mod=logout\'" ' +
                         'style="background:#fff;color:#1a1a2e;border:none;padding:0.4rem 1rem;' +
                         'border-radius:4px;font-weight:600;cursor:pointer;">Volver al login</button>';
