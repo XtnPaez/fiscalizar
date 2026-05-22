@@ -371,7 +371,7 @@ require_once 'includes/navbar.php';
                     msgExito.innerHTML   =
                         '⚠️ Tu mesa fue cerrada por el administrador.<br>' +
                         '<span style="font-size:0.85rem;font-weight:400;">El voto NO fue registrado.</span><br><br>' +
-                        '<button onclick="window.location.href=\'index.php?mod=login\'" ' +
+                        '<button onclick="window.location.href=\'index.php?mod=logout\'" ' +
                         'style="background:#fff;color:#1a1a2e;border:none;padding:0.4rem 1rem;' +
                         'border-radius:4px;font-weight:600;cursor:pointer;">Volver al login</button>';
                     msgExito.style.display = 'block';
